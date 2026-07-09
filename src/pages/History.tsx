@@ -1,0 +1,267 @@
+import { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { FiCalendar, FiFilter, FiSearch, FiDownload, FiChevronLeft, FiChevronRight, FiBook } from 'react-icons/fi';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { StudentProfile } from '../components/student/StudentProfile';
+import { attendanceService } from '../services/attendanceService';
+import { studentsDB } from '../services/db';
+import { exportToCSV, exportToExcel, exportToPDF } from '../services/exportService';
+import { formatDate, formatDateLong, getMonthDays, today } from '../utils/dateUtils';
+import { format } from 'date-fns';
+import type { AttendanceRecord, AttendanceStatus } from '../types';
+import { SUBJECTS } from '../types';
+
+export default function History() {
+  const allStudents = useMemo(() => studentsDB.getAll(), []);
+  const allSessions = useMemo(() => attendanceService.getUniqueSessions(), []);
+
+  const [viewMode, setViewMode] = useState<'date' | 'subject' | 'student' | 'calendar'>('date');
+  const [selectedDate, setSelectedDate] = useState(today());
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedRoll, setSelectedRoll] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(new Date().getMonth());
+  const [profileStudent, setProfileStudent] = useState<typeof allStudents[0] | null>(null);
+
+  // Get records based on view mode
+  const records = useMemo((): AttendanceRecord[] => {
+    switch (viewMode) {
+      case 'date':
+        return attendanceService.getByDate(selectedDate)
+          .filter((r) => !searchQuery || r.studentName.toLowerCase().includes(searchQuery.toLowerCase()) || r.rollNumber.includes(searchQuery));
+      case 'subject':
+        if (!selectedSubject) return [];
+        return attendanceService.getAll().filter((r) => r.subject === selectedSubject)
+          .filter((r) => !searchQuery || r.studentName.toLowerCase().includes(searchQuery.toLowerCase()));
+      case 'student':
+        if (!selectedRoll) return [];
+        return attendanceService.getStudentHistory(selectedRoll).sort((a, b) => b.date.localeCompare(a.date));
+      case 'calendar':
+        return attendanceService.getAll().filter((r) => r.date.startsWith(`${calYear}-${String(calMonth + 1).padStart(2, '0')}`));
+      default:
+        return [];
+    }
+  }, [viewMode, selectedDate, selectedSubject, selectedRoll, searchQuery, calYear, calMonth]);
+
+  const calDays = useMemo(() => getMonthDays(calYear, calMonth), [calYear, calMonth]);
+  const datesWithData = useMemo(() => new Set(attendanceService.getUniqueDates()), []);
+
+  const uniqueSubjects = useMemo(() => [...new Set(attendanceService.getAll().map((r) => r.subject))].sort(), []);
+
+  const handleExport = (type: 'csv' | 'excel' | 'pdf') => {
+    const filename = `History_${viewMode}_${format(new Date(), 'dd-MM-yyyy')}`;
+    if (type === 'csv') exportToCSV(records, filename);
+    else if (type === 'excel') exportToExcel(records, filename);
+    else exportToPDF(records, `Attendance History — ${viewMode}`);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Mode Tabs */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4">
+        <div className="flex flex-wrap gap-2 mb-4">
+          {[
+            { mode: 'date' as const, label: '📅 By Date' },
+            { mode: 'subject' as const, label: '📚 By Subject' },
+            { mode: 'student' as const, label: '👤 By Student' },
+            { mode: 'calendar' as const, label: '🗓 Calendar' },
+          ].map(({ mode, label }) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                viewMode === mode
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-none'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3">
+          {viewMode === 'date' && (
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
+            />
+          )}
+          {viewMode === 'subject' && (
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
+            >
+              <option value="">Select Subject...</option>
+              {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+              {uniqueSubjects.filter((s) => !SUBJECTS.includes(s as typeof SUBJECTS[number])).map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
+          {viewMode === 'student' && (
+            <select
+              value={selectedRoll}
+              onChange={(e) => setSelectedRoll(e.target.value)}
+              className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
+            >
+              <option value="">Select Student...</option>
+              {allStudents.map((s) => <option key={s.rollNumber} value={s.rollNumber}>{s.name} — {s.rollNumber}</option>)}
+            </select>
+          )}
+          {viewMode === 'calendar' && (
+            <div className="flex items-center gap-2">
+              <button onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear((y) => y - 1); } else setCalMonth((m) => m - 1); }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300">
+                <FiChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm font-semibold text-gray-800 dark:text-white min-w-[120px] text-center">
+                {format(new Date(calYear, calMonth), 'MMMM yyyy')}
+              </span>
+              <button onClick={() => { if (calMonth === 11) { setCalMonth(0); setCalYear((y) => y + 1); } else setCalMonth((m) => m + 1); }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300">
+                <FiChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {viewMode !== 'calendar' && (
+            <div className="relative flex-1 min-w-[200px]">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search student..."
+                className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
+              />
+            </div>
+          )}
+
+          <div className="flex gap-2 ml-auto">
+            <Button onClick={() => handleExport('csv')} variant="outline" size="sm" icon={<FiDownload />}>CSV</Button>
+            <Button onClick={() => handleExport('excel')} variant="outline" size="sm" icon={<FiDownload />}>Excel</Button>
+            <Button onClick={() => handleExport('pdf')} variant="outline" size="sm" icon={<FiDownload />}>PDF</Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Calendar View */}
+      {viewMode === 'calendar' && (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6">
+          <div className="grid grid-cols-7 gap-2 mb-2">
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
+              <div key={d} className="text-center text-xs font-semibold text-gray-500 dark:text-gray-400 py-1">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {/* Fill empty days at start */}
+            {[...Array((calDays[0].getDay() + 6) % 7)].map((_, i) => <div key={`e-${i}`} />)}
+            {calDays.map((day) => {
+              const ds = format(day, 'yyyy-MM-dd');
+              const hasData = datesWithData.has(ds);
+              const isToday2 = ds === today();
+              return (
+                <button
+                  key={ds}
+                  onClick={() => hasData && setSelectedDate(ds)}
+                  className={`aspect-square rounded-xl flex flex-col items-center justify-center text-sm transition-all
+                    ${isToday2 ? 'ring-2 ring-indigo-500' : ''}
+                    ${hasData
+                      ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 font-semibold hover:bg-indigo-200'
+                      : 'text-gray-400 dark:text-gray-600 cursor-default'
+                    }
+                  `}
+                >
+                  <span>{day.getDate()}</span>
+                  {hasData && <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full mt-0.5" />}
+                </button>
+              );
+            })}
+          </div>
+          {records.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{records.length} records this month</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Records Table */}
+      {viewMode !== 'calendar' && (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+            <div>
+              <h3 className="text-base font-bold text-gray-800 dark:text-white">
+                {viewMode === 'date' ? formatDateLong(selectedDate) :
+                 viewMode === 'subject' ? (selectedSubject || 'Select a subject') :
+                 allStudents.find((s) => s.rollNumber === selectedRoll)?.name || 'Select a student'}
+              </h3>
+              <p className="text-xs text-gray-400 mt-0.5">{records.length} records</p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            {records.length === 0 ? (
+              <div className="py-16 text-center">
+                <FiCalendar className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                <p className="text-sm text-gray-400">No records found</p>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-700/60 border-b border-gray-100 dark:border-gray-700">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
+                    {viewMode !== 'student' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Roll No.</th>}
+                    {viewMode !== 'student' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Name</th>}
+                    {viewMode !== 'date' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>}
+                    {viewMode !== 'subject' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Subject</th>}
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Faculty</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Lec</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {records.map((r, i) => (
+                    <tr key={r.id || i} className="border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                      <td className="px-4 py-3 text-xs text-gray-400">{i + 1}</td>
+                      {viewMode !== 'student' && <td className="px-4 py-3 text-xs font-mono font-semibold text-indigo-600 dark:text-indigo-400">{r.rollNumber}</td>}
+                      {viewMode !== 'student' && (
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => {
+                              const s = allStudents.find((st) => st.rollNumber === r.rollNumber);
+                              if (s) setProfileStudent(s);
+                            }}
+                            className="text-sm font-medium text-gray-800 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                          >
+                            {r.studentName}
+                          </button>
+                        </td>
+                      )}
+                      {viewMode !== 'date' && <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{formatDate(r.date)}</td>}
+                      {viewMode !== 'subject' && <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{r.subject}</td>}
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{r.faculty}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{r.lectureNumber}</td>
+                      <td className="px-4 py-3"><Badge variant={r.status} label={r.status} dot size="sm" /></td>
+                      <td className="px-4 py-3 text-xs text-gray-400">{r.remarks || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      <StudentProfile
+        student={profileStudent}
+        isOpen={!!profileStudent}
+        onClose={() => setProfileStudent(null)}
+      />
+    </div>
+  );
+}
