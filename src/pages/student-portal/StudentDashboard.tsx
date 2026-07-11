@@ -47,7 +47,8 @@ export default function StudentDashboard() {
   }, [student?.rollNumber]);
   
   const stats = useMemo(() => {
-    return student ? attendanceService.getStudentStats(student.rollNumber) : { present: 0, absent: 0, total: 0, percentage: 0 };
+    const s = student ? attendanceService.getStudentStats(student.rollNumber) : null;
+    return s || { present: 0, absent: 0, late: 0, leave: 0, total: 0, percentage: 0 };
   }, [student?.rollNumber, history.length]); // depend on history.length to recalculate if attendance changes
 
   if (!student) return null;
