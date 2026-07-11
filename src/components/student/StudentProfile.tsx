@@ -409,7 +409,7 @@ export function StudentProfile({ student, isOpen, onClose, isAdmin = false, onSa
               {history.map((r) => (
                 <div key={r.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                   <div>
-                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{r.subject}</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{r.subject.replace(/\|/g, ' • ')}</span>
                     <span className="text-xs text-gray-400 ml-2">Lec {r.lectureNumber}</span>
                   </div>
                   <div className="flex items-center gap-3">

@@ -11,6 +11,7 @@ import { useAuth } from '../../hooks/useAuth';
 const NAV_ITEMS = [
   { path: '/dashboard',  label: 'Dashboard',  icon: <FiHome /> },
   { path: '/attendance', label: 'Attendance', icon: <FiClipboard /> },
+  { path: '/qr-attendance', label: 'QR Attendance', icon: <FiZap /> },
   { path: '/history',    label: 'History',    icon: <FiCalendar /> },
   { path: '/analytics',  label: 'Analytics',  icon: <FiBarChart2 /> },
   { path: '/reports',    label: 'Reports',    icon: <FiFileText /> },

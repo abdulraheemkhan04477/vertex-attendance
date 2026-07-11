@@ -10,20 +10,23 @@ import { exportToCSV, exportToExcel, exportToPDF } from '../services/exportServi
 import { formatDate, formatDateLong, getMonthDays, today } from '../utils/dateUtils';
 import { format } from 'date-fns';
 import type { AttendanceRecord, AttendanceStatus } from '../types';
-import { SUBJECTS } from '../types';
-
+import { AttendanceEditModal } from '../components/attendance/AttendanceEditModal';
+import { useToast } from '../hooks/useToast';
+import { attendanceDB } from '../services/db';
 export default function History() {
   const allStudents = useMemo(() => studentsDB.getAll(), []);
   const allSessions = useMemo(() => attendanceService.getUniqueSessions(), []);
 
-  const [viewMode, setViewMode] = useState<'date' | 'subject' | 'student' | 'calendar'>('date');
+  const [viewMode, setViewMode] = useState<'date' | 'student' | 'calendar'>('date');
   const [selectedDate, setSelectedDate] = useState(today());
-  const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedRoll, setSelectedRoll] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [profileStudent, setProfileStudent] = useState<typeof allStudents[0] | null>(null);
+  const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const toast = useToast();
 
   // Get records based on view mode
   const records = useMemo((): AttendanceRecord[] => {
@@ -31,10 +34,6 @@ export default function History() {
       case 'date':
         return attendanceService.getByDate(selectedDate)
           .filter((r) => !searchQuery || r.studentName.toLowerCase().includes(searchQuery.toLowerCase()) || r.rollNumber.includes(searchQuery));
-      case 'subject':
-        if (!selectedSubject) return [];
-        return attendanceService.getAll().filter((r) => r.subject === selectedSubject)
-          .filter((r) => !searchQuery || r.studentName.toLowerCase().includes(searchQuery.toLowerCase()));
       case 'student':
         if (!selectedRoll) return [];
         return attendanceService.getStudentHistory(selectedRoll).sort((a, b) => b.date.localeCompare(a.date));
@@ -43,18 +42,30 @@ export default function History() {
       default:
         return [];
     }
-  }, [viewMode, selectedDate, selectedSubject, selectedRoll, searchQuery, calYear, calMonth]);
+  }, [viewMode, selectedDate, selectedRoll, searchQuery, calYear, calMonth, refreshKey]);
 
   const calDays = useMemo(() => getMonthDays(calYear, calMonth), [calYear, calMonth]);
-  const datesWithData = useMemo(() => new Set(attendanceService.getUniqueDates()), []);
-
-  const uniqueSubjects = useMemo(() => [...new Set(attendanceService.getAll().map((r) => r.subject))].sort(), []);
+  const datesWithData = useMemo(() => new Set(attendanceService.getUniqueDates()), [refreshKey]);
 
   const handleExport = (type: 'csv' | 'excel' | 'pdf') => {
     const filename = `History_${viewMode}_${format(new Date(), 'dd-MM-yyyy')}`;
     if (type === 'csv') exportToCSV(records, filename);
     else if (type === 'excel') exportToExcel(records, filename);
     else exportToPDF(records, `Attendance History — ${viewMode}`);
+  };
+
+  const handleEditSave = (id: string, changes: Partial<AttendanceRecord>) => {
+    attendanceDB.update(id, changes);
+    setRefreshKey((k) => k + 1);
+    toast.success('Attendance record updated');
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm('Are you sure you want to delete this record?')) {
+      attendanceDB.delete(id);
+      setRefreshKey((k) => k + 1);
+      toast.success('Attendance record deleted');
+    }
   };
 
   return (
@@ -64,7 +75,6 @@ export default function History() {
         <div className="flex flex-wrap gap-2 mb-4">
           {[
             { mode: 'date' as const, label: '📅 By Date' },
-            { mode: 'subject' as const, label: '📚 By Subject' },
             { mode: 'student' as const, label: '👤 By Student' },
             { mode: 'calendar' as const, label: '🗓 Calendar' },
           ].map(({ mode, label }) => (
@@ -92,17 +102,7 @@ export default function History() {
               className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
             />
           )}
-          {viewMode === 'subject' && (
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
-            >
-              <option value="">Select Subject...</option>
-              {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-              {uniqueSubjects.filter((s) => !SUBJECTS.includes(s as typeof SUBJECTS[number])).map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          )}
+
           {viewMode === 'student' && (
             <select
               value={selectedRoll}
@@ -197,7 +197,6 @@ export default function History() {
             <div>
               <h3 className="text-base font-bold text-gray-800 dark:text-white">
                 {viewMode === 'date' ? formatDateLong(selectedDate) :
-                 viewMode === 'subject' ? (selectedSubject || 'Select a subject') :
                  allStudents.find((s) => s.rollNumber === selectedRoll)?.name || 'Select a student'}
               </h3>
               <p className="text-xs text-gray-400 mt-0.5">{records.length} records</p>
@@ -217,11 +216,12 @@ export default function History() {
                     {viewMode !== 'student' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Roll No.</th>}
                     {viewMode !== 'student' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Name</th>}
                     {viewMode !== 'date' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>}
-                    {viewMode !== 'subject' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Subject</th>}
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Session</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Faculty</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Lec</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Remarks</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -243,11 +243,27 @@ export default function History() {
                         </td>
                       )}
                       {viewMode !== 'date' && <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{formatDate(r.date)}</td>}
-                      {viewMode !== 'subject' && <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{r.subject}</td>}
+                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{r.subject}</td>
                       <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{r.faculty}</td>
                       <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{r.lectureNumber}</td>
                       <td className="px-4 py-3"><Badge variant={r.status} label={r.status} dot size="sm" /></td>
                       <td className="px-4 py-3 text-xs text-gray-400">{r.remarks || '—'}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setEditRecord(r)}
+                            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(r.id)}
+                            className="text-xs font-medium text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2 py-1 rounded"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -261,6 +277,13 @@ export default function History() {
         student={profileStudent}
         isOpen={!!profileStudent}
         onClose={() => setProfileStudent(null)}
+      />
+
+      <AttendanceEditModal
+        isOpen={!!editRecord}
+        onClose={() => setEditRecord(null)}
+        record={editRecord}
+        onSave={handleEditSave}
       />
     </div>
   );

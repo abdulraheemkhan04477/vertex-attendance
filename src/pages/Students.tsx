@@ -25,7 +25,10 @@ export default function Students() {
   const toast = useToast();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
-  const allStudents = useMemo(() => studentsDB.getAll(), [refreshTrigger]);
+  const allStudents = useMemo(() => {
+    const list = studentsDB.getAll();
+    return list.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true }));
+  }, [refreshTrigger]);
   const allStats = useMemo(() => attendanceService.getAllStudentStats(), [refreshTrigger]);
   
   const statsMap = useMemo(() => {

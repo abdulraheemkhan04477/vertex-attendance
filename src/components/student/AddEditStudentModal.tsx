@@ -22,6 +22,7 @@ const DEFAULT_FORM = {
   semester: '',
   email: '',
   phone: '',
+  gender: 'Other',
   dob: '',
   address: '',
   guardianName: '',
@@ -48,6 +49,7 @@ export function AddEditStudentModal({ isOpen, onClose, student, onSave }: AddEdi
         ...student,
         fatherName: student.fatherName ?? '',
         motherName: student.motherName ?? '',
+        gender: student.gender ?? 'Other',
         profilePhoto: student.profilePhoto ?? '',
       });
     } else {
@@ -55,15 +57,20 @@ export function AddEditStudentModal({ isOpen, onClose, student, onSave }: AddEdi
     }
   }, [student, isOpen]);
 
-  // Update semester when year changes
+  // Update semester when year changes if the current semester is no longer valid
   useEffect(() => {
-    if (form.year && !student) {
+    if (form.year) {
       const sems = SEMESTERS_BY_YEAR[form.year];
       if (sems && sems.length > 0) {
-        setForm(prev => ({ ...prev, semester: sems[0] }));
+        setForm(prev => {
+          if (!prev.semester || !sems.includes(prev.semester)) {
+            return { ...prev, semester: sems[0] };
+          }
+          return prev;
+        });
       }
     }
-  }, [form.year, student]);
+  }, [form.year]);
 
   if (!isOpen) return null;
 
@@ -293,6 +300,18 @@ export function AddEditStudentModal({ isOpen, onClose, student, onSave }: AddEdi
                         onChange={(e) => setForm({ ...form, phone: e.target.value })}
                         className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Gender</label>
+                      <select
+                        value={form.gender}
+                        onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                        className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Date of Birth</label>

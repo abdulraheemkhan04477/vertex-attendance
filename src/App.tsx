@@ -11,6 +11,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Attendance from './pages/Attendance';
 import History from './pages/History';
+import QRAttendance from './pages/QRAttendance';
 import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
 import Students from './pages/Students';
@@ -57,6 +58,7 @@ export default function App() {
         {/* Protected */}
         <Route path="/dashboard"  element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
+        <Route path="/qr-attendance" element={<ProtectedRoute><QRAttendance /></ProtectedRoute>} />
         <Route path="/history"    element={<ProtectedRoute><History /></ProtectedRoute>} />
         <Route path="/analytics"  element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
         <Route path="/reports"    element={<ProtectedRoute><Reports /></ProtectedRoute>} />

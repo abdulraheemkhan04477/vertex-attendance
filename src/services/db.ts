@@ -20,6 +20,7 @@ const KEYS = {
   AUTH: 'vertex_auth',
   STUDENT_AUTH: 'vertex_student_auth',
   CLOUD_SYNCED: 'vertex_cloud_synced',
+  QR_SESSIONS: 'vertex_qr_sessions',
 } as const;
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -79,6 +80,7 @@ function rowToStudent(row: Record<string, unknown>): Student {
     guardianPhone: (row.guardian_phone as string) || '',
     fatherName: (row.father_name as string) || undefined,
     motherName: (row.mother_name as string) || undefined,
+    gender: (row.gender as string) || undefined,
     profilePhoto: (row.profile_photo as string) || undefined,
     password: (row.password as string) || '',
     enrollmentYear: (row.enrollment_year as string) || '',
@@ -103,6 +105,7 @@ function studentToRow(s: Partial<Student> & { id?: string; rollNumber?: string }
     ...(s.guardianPhone !== undefined && { guardian_phone: s.guardianPhone }),
     ...(s.fatherName !== undefined && { father_name: s.fatherName }),
     ...(s.motherName !== undefined && { mother_name: s.motherName }),
+    ...(s.gender !== undefined && { gender: s.gender }),
     ...(s.profilePhoto !== undefined && { profile_photo: s.profilePhoto }),
     ...(s.password !== undefined && { password: s.password }),
     ...(s.enrollmentYear !== undefined && { enrollment_year: s.enrollmentYear }),
@@ -127,7 +130,6 @@ function rowToAttendance(row: Record<string, unknown>): AttendanceRecord {
     year: row.year as string | undefined,
     branch: row.branch as string | undefined,
     semesterNum: row.semester_num as string | undefined,
-    subjectName: row.subject_name as string | undefined,
   };
 }
 
@@ -147,7 +149,6 @@ function attendanceToRow(r: Partial<AttendanceRecord> & { id?: string }) {
     ...(r.year !== undefined && { year: r.year }),
     ...(r.branch !== undefined && { branch: r.branch }),
     ...(r.semesterNum !== undefined && { semester_num: r.semesterNum }),
-    ...(r.subjectName !== undefined && { subject_name: r.subjectName }),
   };
 }
 
@@ -182,9 +183,39 @@ export async function syncFromCloud(): Promise<void> {
       .from('app_settings')
       .select('*')
       .eq('key', 'settings')
-      .single();
+      .maybeSingle();
     if (!ste && settingsRows) {
       setObject<AppSettings>(KEYS.SETTINGS, settingsRows.value as AppSettings);
+    }
+
+    // Pull admin auth
+    const { data: authRows, error: authe } = await supabase
+      .from('app_settings')
+      .select('*')
+      .eq('key', 'admin_auth')
+      .maybeSingle();
+    if (!authe && authRows && authRows.value) {
+      const authVal = authRows.value as { password?: string; lastChanged?: string };
+      if (authVal.password) localStorage.setItem('vertex_admin_pwd', authVal.password);
+      if (authVal.lastChanged) localStorage.setItem('vertex_admin_pwd_changed', authVal.lastChanged);
+    }
+
+    // Pull QR sessions
+    const { data: qrRows, error: qrErr } = await supabase
+      .from('qr_sessions')
+      .select('*');
+    if (!qrErr && qrRows) {
+      const formatted = qrRows.map(r => ({
+        id: r.id,
+        year: r.year,
+        branch: r.branch,
+        semester: r.semester,
+        lectureNumber: r.lecture_number,
+        date: r.date,
+        expiresAt: r.expires_at,
+        createdBy: r.created_by,
+      }));
+      setItem(KEYS.QR_SESSIONS, formatted);
     }
 
     localStorage.setItem(KEYS.CLOUD_SYNCED, 'true');
@@ -360,6 +391,18 @@ export const attendanceDB = {
       }
     }
   },
+
+  delete(id: string): void {
+    const all = this.getAll();
+    const filtered = all.filter((r) => r.id !== id);
+    setItem<AttendanceRecord>(KEYS.ATTENDANCE, filtered);
+    // Background cloud delete
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('attendance_records').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase delete attendance error:', error.message);
+      });
+    }
+  },
 };
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
@@ -384,6 +427,77 @@ export const settingsDB = {
   },
 };
 
+
+// ─── QR Sessions ──────────────────────────────────────────────────────────────
+export const qrSessionsDB = {
+  getAll(): import('../types').QrSession[] {
+    return getItem<import('../types').QrSession>(KEYS.QR_SESSIONS);
+  },
+
+  getById(id: string): import('../types').QrSession | undefined {
+    return this.getAll().find(s => s.id === id);
+  },
+
+  add(session: import('../types').QrSession): void {
+    const all = this.getAll();
+    all.push(session);
+    setItem(KEYS.QR_SESSIONS, all);
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('qr_sessions').insert({
+        id: session.id,
+        subject: `${session.year}|${session.branch}|${session.semester}`,
+        year: session.year,
+        branch: session.branch,
+        semester: session.semester,
+        lecture_number: session.lectureNumber,
+        date: session.date,
+        expires_at: session.expiresAt,
+        created_by: session.createdBy,
+      }).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase insert QR session error:', error.message);
+      });
+    }
+  },
+
+  async fetchSessionFromCloud(id: string): Promise<import('../types').QrSession | null> {
+    if (!isSupabaseConfigured || !supabase) {
+      console.warn('[DB] Supabase not configured. Cannot fetch session from cloud.');
+      return null;
+    }
+    console.log(`[DB] Fetching session ${id} from cloud...`);
+    const { data, error } = await supabase.from('qr_sessions').select('*').eq('id', id).maybeSingle();
+    if (error) {
+      console.error('[DB] Supabase fetch error in fetchSessionFromCloud:', error.message);
+      return null;
+    }
+    if (!data) {
+      console.warn('[DB] Session not found in cloud.');
+      return null;
+    }
+    
+    const session = {
+      id: data.id,
+      year: data.year,
+      branch: data.branch,
+      semester: data.semester,
+      lectureNumber: data.lecture_number,
+      date: data.date,
+      expiresAt: data.expires_at,
+      createdBy: data.created_by,
+    };
+    
+    // Cache it locally so subsequent lookups are fast
+    const all = this.getAll();
+    if (!all.find(s => s.id === session.id)) {
+      all.push(session);
+      setItem(KEYS.QR_SESSIONS, all);
+    }
+    
+    return session;
+  },
+};
+
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 export const authDB = {
   setToken(value: string): void {
@@ -394,6 +508,14 @@ export const authDB = {
   },
   clearToken(): void {
     localStorage.removeItem(KEYS.AUTH);
+  },
+
+  syncAdminAuth(password: string, lastChanged: string): void {
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('app_settings').upsert({ key: 'admin_auth', value: { password, lastChanged } }).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase sync admin auth error:', error.message);
+      });
+    }
   },
 
   // Student Portal Auth

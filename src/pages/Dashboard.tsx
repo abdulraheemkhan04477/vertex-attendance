@@ -166,7 +166,7 @@ export default function Dashboard() {
                     className="px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                   >
                     <div>
-                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{s.subject}</p>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{s.subject.replace(/\|/g, ' • ')}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
                         Lec {s.lectureNumber} • {s.faculty} • {formatDate(s.date)}
                       </p>
