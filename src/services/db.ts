@@ -234,7 +234,33 @@ export async function syncFromCloud(): Promise<void> {
       setItem(KEYS.QR_SESSIONS, formatted);
     }
 
-    // (Removed users and colleges sync to prevent 404 console errors since tables may not exist yet)
+    // Pull colleges
+    const { data: collegesRows, error: ce } = await supabase.from('colleges').select('*');
+    if (!ce && collegesRows && collegesRows.length > 0) {
+      setItem<College>(KEYS.COLLEGES, collegesRows.map(r => ({
+        id: r.id,
+        name: r.name,
+        code: r.code,
+        logoUrl: r.logo_url || r.logoUrl,
+        createdAt: r.created_at || r.createdAt,
+      })));
+    }
+
+    // Pull users
+    const { data: usersRows, error: ue } = await supabase.from('users').select('*');
+    if (!ue && usersRows && usersRows.length > 0) {
+      setItem<User>(KEYS.USERS, usersRows.map(r => ({
+        id: r.id,
+        collegeId: r.college_id || r.collegeId,
+        username: r.username,
+        password: r.password,
+        role: r.role,
+        name: r.name,
+        isActive: r.is_active !== undefined ? r.is_active : r.isActive,
+        createdAt: r.created_at || r.createdAt,
+      })));
+    }
+
     localStorage.setItem(KEYS.CLOUD_SYNCED, 'true');
     console.log('[DB] Synced from Supabase cloud.');
   } catch (err) {
@@ -249,16 +275,25 @@ export function seedDatabase(): void {
     setObject<AppSettings>(KEYS.SETTINGS, DEFAULT_SETTINGS);
     
     // Seed initial users
-    const initialUsers: User[] = [
-      {
+    const initialUsers: User[] = [];
+    
+    // Check for super admin credentials from environment variables (avoid hardcoding)
+    const envSuperUsername = import.meta.env.VITE_SUPERADMIN_USERNAME;
+    const envSuperPassword = import.meta.env.VITE_SUPERADMIN_PASSWORD;
+    
+    if (envSuperUsername && envSuperPassword) {
+      initialUsers.push({
         id: 'super-admin-1',
-        username: 'admin',
-        password: 'adminpassword',
+        username: envSuperUsername,
+        password: envSuperPassword,
         role: 'superadmin',
         name: 'System Owner',
         isActive: true,
         createdAt: new Date().toISOString()
-      },
+      });
+    }
+
+    initialUsers.push(
       {
         id: 'college-admin-1',
         collegeId: 'default-college',
@@ -269,7 +304,7 @@ export function seedDatabase(): void {
         isActive: true,
         createdAt: new Date().toISOString()
       }
-    ];
+    );
     setItem<User>(KEYS.USERS, initialUsers);
     
     localStorage.setItem(KEYS.SEEDED, 'true');
@@ -279,18 +314,36 @@ export function seedDatabase(): void {
     let users = getItem<User>(KEYS.USERS);
     let colleges = getItem<College>(KEYS.COLLEGES);
     let changed = false;
-    
+
     if (!users.some(u => u.role === 'superadmin')) {
-      users.push({
-        id: 'super-admin-1',
-        username: 'admin',
-        password: 'adminpassword',
-        role: 'superadmin',
-        name: 'System Owner',
-        isActive: true,
-        createdAt: new Date().toISOString()
-      });
-      changed = true;
+      const envSuperUsername = import.meta.env.VITE_SUPERADMIN_USERNAME;
+      const envSuperPassword = import.meta.env.VITE_SUPERADMIN_PASSWORD;
+      
+      if (envSuperUsername && envSuperPassword) {
+        users.push({
+          id: 'super-admin-1',
+          username: envSuperUsername,
+          password: envSuperPassword,
+          role: 'superadmin',
+          name: 'System Owner',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        });
+        changed = true;
+      }
+    } else {
+      // If superadmin exists, ensure it syncs with env vars if provided
+      const envSuperUsername = import.meta.env.VITE_SUPERADMIN_USERNAME;
+      const envSuperPassword = import.meta.env.VITE_SUPERADMIN_PASSWORD;
+      
+      if (envSuperUsername && envSuperPassword) {
+        const superAdmin = users.find(u => u.role === 'superadmin');
+        if (superAdmin && (superAdmin.username !== envSuperUsername || superAdmin.password !== envSuperPassword)) {
+          superAdmin.username = envSuperUsername;
+          superAdmin.password = envSuperPassword;
+          changed = true;
+        }
+      }
     }
 
     if (!users.some(u => u.role === 'college_admin')) {

@@ -65,7 +65,7 @@ export default function App() {
       <Routes>
         {/* Public */}
         <Route path="/login" element={<Login />} />
-        <Route path="/owner" element={<OwnerLogin />} />
+        <Route path="/veneyd04477" element={<OwnerLogin />} />
 
         {/* Protected */}
         <Route path="/dashboard"  element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
