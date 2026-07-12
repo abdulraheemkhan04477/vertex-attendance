@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   FiSearch, FiSave, FiRefreshCw, FiCheckCircle, FiXCircle, FiFilter,
-  FiDownload, FiUsers, FiChevronLeft, FiChevronRight
+  FiDownload, FiUsers, FiChevronLeft, FiChevronRight, FiZap
 } from 'react-icons/fi';
 import { AttendanceRow } from '../components/attendance/AttendanceRow';
 import { StudentProfile } from '../components/student/StudentProfile';
@@ -13,7 +13,7 @@ import { exportToCSV, exportToExcel, exportToPDF } from '../services/exportServi
 import { useToast } from '../hooks/useToast';
 import { today } from '../utils/dateUtils';
 import type { Student, AttendanceStatus } from '../types';
-import { YEARS, BRANCHES, SEMESTERS_BY_YEAR, SUBJECTS_BY_SEMESTER } from '../types';
+import { YEARS, BRANCHES, SEMESTERS_BY_YEAR } from '../types';
 import { useStore } from '../store/useStore';
 
 const PAGE_SIZE = 20;
@@ -23,40 +23,31 @@ type FilterType = 'all' | AttendanceStatus;
 export default function Attendance() {
   const toast = useToast();
   const { settings } = useStore();
-  const allStudents = useMemo(() => studentsDB.getAll(), []);
+  const allStudents = useMemo(() => {
+    const list = studentsDB.getAll();
+    return list.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true }));
+  }, []);
 
   // Session state
   const [date, setDate] = useState(today());
   const [year, setYear] = useState('');
   const [branch, setBranch] = useState('');
   const [semester, setSemester] = useState('');
-  const [subject, setSubject] = useState('');
   const [lectureNumber, setLectureNumber] = useState(1);
 
   // Derived available options
   const availableSemesters = year ? SEMESTERS_BY_YEAR[year] || [] : [];
-  const availableSubjects = useMemo(() => {
-    if (!semester || !branch) return [];
-    const semData = SUBJECTS_BY_SEMESTER[semester];
-    if (!semData) return [];
-    return semData[branch] || semData.default || [];
-  }, [semester, branch]);
 
-  // Derived full subject string for storage
+  // Derived full subject string for storage (now just year/branch/sem)
   const fullSubject = useMemo(() => {
-    if (!year || !branch || !semester || !subject) return '';
-    return `${year}|${branch}|${semester}|${subject}`;
-  }, [year, branch, semester, subject]);
+    if (!year || !branch || !semester) return '';
+    return `${year}|${branch}|${semester}`;
+  }, [year, branch, semester]);
 
   // Reset dependent fields when parent changes
   useEffect(() => {
     setSemester('');
-    setSubject('');
   }, [year, branch]);
-  
-  useEffect(() => {
-    setSubject('');
-  }, [semester]);
 
   // Attendance state: rollNumber -> status/remark
   const [statusMap, setStatusMap] = useState<Record<string, AttendanceStatus | null>>({});
@@ -72,6 +63,7 @@ export default function Attendance() {
   const [page, setPage] = useState(1);
   const [saving, setSaving] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
 
   // Load existing session data when session params change
   useEffect(() => {
@@ -145,7 +137,7 @@ export default function Attendance() {
   }, [allStudents, pushUndo, toast]);
 
   const handleSave = useCallback(async () => {
-    if (!fullSubject) { toast.error('Please select Year, Branch, Semester, and Subject'); return; }
+    if (!fullSubject) { toast.error('Please select Year, Branch, and Semester'); return; }
     
     const faculty = settings.facultyName || 'Default Faculty';
     
@@ -163,8 +155,7 @@ export default function Attendance() {
         remarks: remarkMap[s.rollNumber] || '',
         year,
         branch,
-        semesterNum: semester,
-        subjectName: subject
+        semesterNum: semester
       }));
     if (records.length === 0) { toast.warning('Please mark at least one student'); return; }
     setSaving(true);
@@ -172,7 +163,8 @@ export default function Attendance() {
     attendanceService.saveSession(records);
     setSaving(false);
     toast.success(`✅ Attendance saved for ${records.length} students!`);
-  }, [fullSubject, year, branch, semester, subject, settings.facultyName, date, lectureNumber, allStudents, statusMap, remarkMap, toast]);
+  }, [fullSubject, year, branch, semester, settings.facultyName, date, lectureNumber, allStudents, statusMap, remarkMap, toast]);
+
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -232,7 +224,7 @@ export default function Attendance() {
       {/* Session Config */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5">
         <h3 className="text-sm font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-4">Academic Session</h3>
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="col-span-2 md:col-span-1">
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Date</label>
             <input
@@ -276,18 +268,7 @@ export default function Attendance() {
               {availableSemesters.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Subject</label>
-            <select
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              disabled={!semester || !branch}
-              className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white disabled:opacity-50"
-            >
-              <option value="">Select Subject...</option>
-              {availableSubjects.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
+
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Lecture</label>
             <select
@@ -312,9 +293,9 @@ export default function Attendance() {
           <div className="flex-1" />
 
           {/* Export */}
-          <Button onClick={() => exportToCSV(currentRecords, `Attendance_${date}_${subject}`)} variant="outline" size="sm" icon={<FiDownload />}>CSV</Button>
-          <Button onClick={() => exportToExcel(currentRecords, `Attendance_${date}_${subject}`)} variant="outline" size="sm" icon={<FiDownload />}>Excel</Button>
-          <Button onClick={() => exportToPDF(currentRecords, `Attendance ${date} - ${subject}`)} variant="outline" size="sm" icon={<FiDownload />}>PDF</Button>
+          <Button onClick={() => exportToCSV(currentRecords, `Attendance_${date}_${semester}`)} variant="outline" size="sm" icon={<FiDownload />}>CSV</Button>
+          <Button onClick={() => exportToExcel(currentRecords, `Attendance_${date}_${semester}`)} variant="outline" size="sm" icon={<FiDownload />}>Excel</Button>
+          <Button onClick={() => exportToPDF(currentRecords, `Attendance ${date} - ${semester}`)} variant="outline" size="sm" icon={<FiDownload />}>PDF</Button>
 
           {/* Save */}
           <Button onClick={handleSave} loading={saving} variant="primary" size="sm" icon={<FiSave />}>

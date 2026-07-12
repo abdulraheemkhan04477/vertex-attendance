@@ -1,10 +1,19 @@
 // ── Interfaces ─────────────────────────────────────────────────
+export interface College {
+  id: string;
+  name: string;
+  code: string;
+  logoUrl?: string;
+  createdAt: string;
+}
+
 export interface Student {
   id: string;
   rollNumber: string;
   name: string;
   department: string;
   semester: string;
+  collegeId?: string; // Links student to a college
   // Extended academic fields
   year: string;        // '1st Year' | '2nd Year' | '3rd Year' | '4th Year'
   branch: string;      // 'EC/ECE' | 'CS/CSE' | etc.
@@ -17,6 +26,7 @@ export interface Student {
   guardianPhone: string;
   fatherName?: string;   // Father's name
   motherName?: string;   // Mother's name
+  gender?: string;       // Male, Female, Other
   profilePhoto?: string; // base64 data URL
   // Portal auth
   password: string;    // default = rollNumber
@@ -32,8 +42,9 @@ export interface AttendanceRecord {
   studentId: string;
   rollNumber: string;
   studentName: string;
+  collegeId?: string;
   date: string;
-  subject: string;       // stores academic context: "3rd Year|EC/ECE|Sem 6|Digital Communication"
+  subject?: string;       // stores academic context: "3rd Year|EC/ECE|Sem 6|General"
   faculty: string;
   lectureNumber: number;
   status: AttendanceStatus;
@@ -43,7 +54,36 @@ export interface AttendanceRecord {
   year?: string;
   branch?: string;
   semesterNum?: string;
-  subjectName?: string;
+}
+
+
+export interface QrSession {
+  id: string;
+  collegeId?: string;
+  year: string;
+  branch: string;
+  semester: string;
+  lectureNumber: number;
+  date: string;
+  expiresAt: string;
+  createdBy: string;
+}
+
+export type UserRole = 'superadmin' | 'college_admin' | 'hod' | 'teacher';
+
+export interface User {
+  id: string;
+  username: string;
+  password?: string;
+  role: UserRole;
+  name: string;
+  collegeId?: string;
+  // Role-specific fields
+  email?: string;
+  department?: string; // For HODs and Teachers
+  assignedClasses?: Array<{ year: string; branch: string; semester: string; section?: string }>; // For Teachers
+  isActive: boolean;
+  createdAt: string;
 }
 
 export interface AppSettings {
@@ -52,6 +92,17 @@ export interface AppSettings {
   semester: string;
   facultyName: string;
   theme: 'light' | 'dark';
+  collegeId?: string;
+  // Branding
+  logoUrl?: string;
+  collegeLogo?: string;
+  loginLogo?: string;
+  dashboardLogo?: string;
+  collegeEmail?: string;
+  contactNumber?: string;
+  website?: string;
+  address?: string;
+  supportEmail?: string;
 }
 
 export interface AttendanceStats {
@@ -91,7 +142,8 @@ export const BRANCHES = [
   'CE/CIVIL',
   'EE/EEE',
   'IT',
-  'CH/CHEM',
+  'Biotech',
+  'CSD',
   'AI/ML',
 ] as const;
 export type Branch = typeof BRANCHES[number];
@@ -103,65 +155,17 @@ export const SEMESTERS_BY_YEAR: Record<string, string[]> = {
   '4th Year': ['Sem 7', 'Sem 8'],
 };
 
-export const SUBJECTS_BY_SEMESTER: Record<string, Record<string, string[]>> = {
-  'Sem 1': {
-    default: ['Mathematics-I', 'Physics', 'Chemistry', 'English', 'Basic Electronics', 'Engineering Drawing'],
-  },
-  'Sem 2': {
-    default: ['Mathematics-II', 'Environmental Science', 'Basic Electrical', 'Programming in C', 'Workshop', 'Communication Skills'],
-  },
-  'Sem 3': {
-    'EC/ECE': ['Network Analysis', 'Electronic Devices', 'Digital Electronics', 'Signals & Systems', 'Electromagnetic Theory'],
-    'CS/CSE': ['Data Structures', 'Discrete Mathematics', 'Computer Architecture', 'OOP in Java', 'Digital Logic'],
-    default:  ['Mathematics-III', 'Fluid Mechanics', 'Thermodynamics', 'Strength of Materials', 'Manufacturing Processes'],
-  },
-  'Sem 4': {
-    'EC/ECE': ['Analog Electronics', 'Control Systems', 'Communication Theory', 'Microprocessors', 'VLSI Design'],
-    'CS/CSE': ['Database Management', 'Operating Systems', 'Theory of Computation', 'Analysis of Algorithms', 'Software Engineering'],
-    default:  ['Mathematics-IV', 'Heat Transfer', 'Machine Design', 'Production Technology', 'Industrial Management'],
-  },
-  'Sem 5': {
-    'EC/ECE': ['Digital Communication', 'Microprocessor & Interface', 'VLSI', 'Control System', 'Industrial Training'],
-    'CS/CSE': ['Computer Networks', 'Compiler Design', 'AI & Machine Learning', 'Web Technologies', 'System Software'],
-    default:  ['Operations Research', 'Power Systems', 'Electrical Machines', 'Power Electronics', 'Industrial Automation'],
-  },
-  'Sem 6': {
-    'EC/ECE': ['Digital Communication', 'Microprocessor', 'VLSI', 'Control System', 'Industrial Training', 'Project'],
-    'CS/CSE': ['Distributed Systems', 'Information Security', 'Cloud Computing', 'Mobile Computing', 'Project'],
-    default:  ['Power System Protection', 'Drives & Control', 'Renewable Energy', 'Smart Grid', 'Project'],
-  },
-  'Sem 7': {
-    'EC/ECE': ['Wireless Communication', 'DSP', 'Embedded Systems', 'Optical Fiber Communication', 'Project-II'],
-    'CS/CSE': ['Big Data Analytics', 'IoT', 'Blockchain', 'Natural Language Processing', 'Project-II'],
-    default:  ['Advanced Power Systems', 'Electric Vehicles', 'Smart Manufacturing', 'Industry 4.0', 'Project-II'],
-  },
-  'Sem 8': {
-    'EC/ECE': ['Radar & Navigation', '5G Networks', 'MEMS', 'Elective-I', 'Major Project'],
-    'CS/CSE': ['Quantum Computing', 'AR/VR', 'Elective-I', 'Elective-II', 'Major Project'],
-    default:  ['Energy Audit', 'Power Quality', 'Elective-I', 'Elective-II', 'Major Project'],
-  },
-};
+// Legacy constant removed, subjects are now loaded from the database per branch/semester.
+
 
 export interface AcademicSelection {
   year: string;
   branch: string;
   semester: string;
-  subject: string;
   lectureNumber: number;
 }
 
-// ── Existing subject list (kept for backward compat) ──────────────
-export const SUBJECTS = [
-  'Digital Communication',
-  'Microprocessor',
-  'VLSI',
-  'Control System',
-  'Industrial Training',
-  'Project',
-  'Custom Subject',
-] as const;
-
-export type Subject = typeof SUBJECTS[number];
+// Subject types removed, dynamically managed via database instead.
 
 // ── Status constants ──────────────────────────────────────────────
 export const STATUS_COLORS: Record<AttendanceStatus, string> = {

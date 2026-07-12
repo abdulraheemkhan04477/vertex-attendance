@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { FiMenu, FiSun, FiMoon, FiBell } from 'react-icons/fi';
 import { useStore } from '../../store/useStore';
+import { collegesDB } from '../../services/db';
 import { formatDate } from '../../utils/dateUtils';
 import { format } from 'date-fns';
 
@@ -16,9 +17,11 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 export function Header() {
-  const { toggleSidebar, toggleTheme, theme, settings } = useStore();
+  const { toggleSidebar, toggleTheme, theme, settings, currentUser, activeCollegeId, setActiveCollegeId } = useStore();
   const location = useLocation();
   const [time, setTime] = useState(new Date());
+
+  const allColleges = currentUser?.role === 'superadmin' ? collegesDB.getAll() : [];
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -44,6 +47,27 @@ export function Header() {
           {formatDate(format(new Date(), 'yyyy-MM-dd'))} • {settings.semester}
         </p>
       </div>
+
+      {/* College Switcher for Super Admin */}
+      {currentUser?.role === 'superadmin' && (
+        <div className="hidden md:flex items-center">
+          <select
+            value={activeCollegeId || 'ALL'}
+            onChange={(e) => {
+              setActiveCollegeId(e.target.value);
+              window.location.reload(); // Reload to refresh all local state data
+            }}
+            className="text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+          >
+            <option value="ALL">All Colleges (Global View)</option>
+            {allColleges.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} ({c.code})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Live clock */}
       <div className="hidden md:flex flex-col items-end">

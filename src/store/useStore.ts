@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ToastMessage, AppSettings } from '../types';
+import type { ToastMessage, AppSettings, User } from '../types';
 import { settingsDB } from '../services/db';
 
 interface AppStore {
@@ -11,6 +11,10 @@ interface AppStore {
   // ─── Auth ─────────────────────────────────────────
   isAuthenticated: boolean;
   setAuthenticated: (val: boolean) => void;
+  currentUser: User | null;
+  setCurrentUser: (user: User | null) => void;
+  activeCollegeId: string | null;
+  setActiveCollegeId: (id: string | null) => void;
 
   // ─── Sidebar ──────────────────────────────────────
   sidebarOpen: boolean;
@@ -48,6 +52,17 @@ export const useStore = create<AppStore>((set, get) => ({
   // ─── Auth ─────────────────────────────────────────
   isAuthenticated: false,
   setAuthenticated: (val) => set({ isAuthenticated: val }),
+  currentUser: null,
+  setCurrentUser: (user) => set({ currentUser: user }),
+  activeCollegeId: localStorage.getItem('vertex_active_college'),
+  setActiveCollegeId: (id) => {
+    if (id) {
+      localStorage.setItem('vertex_active_college', id);
+    } else {
+      localStorage.removeItem('vertex_active_college');
+    }
+    set({ activeCollegeId: id });
+  },
 
   // ─── Sidebar ──────────────────────────────────────
   sidebarOpen: true,

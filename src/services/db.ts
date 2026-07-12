@@ -8,7 +8,7 @@
  *  - This keeps all existing component code working unchanged (sync API)
  */
 
-import type { Student, AttendanceRecord, AppSettings } from '../types';
+import type { Student, AttendanceRecord, AppSettings, User, College } from '../types';
 import { STUDENTS_DATA } from '../data/students';
 import { supabase, isSupabaseConfigured } from './supabase';
 
@@ -20,7 +20,15 @@ const KEYS = {
   AUTH: 'vertex_auth',
   STUDENT_AUTH: 'vertex_student_auth',
   CLOUD_SYNCED: 'vertex_cloud_synced',
+  QR_SESSIONS: 'vertex_qr_sessions',
+  USERS: 'vertex_users',
+  COLLEGES: 'vertex_colleges',
 } as const;
+
+// ─── Active College Helper ───────────────────────────────────────────────────
+export function getActiveCollegeId(): string | null {
+  return localStorage.getItem('vertex_active_college');
+}
 
 const DEFAULT_SETTINGS: AppSettings = {
   instituteName: 'Vertex Institute of Technology',
@@ -28,6 +36,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   semester: 'B.Tech Academic Year 2024-25',
   facultyName: 'Faculty Name',
   theme: 'light',
+  supportEmail: 'zuneydkhan04477@gmail.com',
 };
 
 // ─── Local helpers ─────────────────────────────────────────────────────────────
@@ -65,6 +74,7 @@ export function generateId(): string {
 function rowToStudent(row: Record<string, unknown>): Student {
   return {
     id: row.id as string,
+    collegeId: (row.college_id as string) || 'default-college',
     rollNumber: row.roll_number as string,
     name: row.name as string,
     department: (row.department as string) || '',
@@ -79,6 +89,7 @@ function rowToStudent(row: Record<string, unknown>): Student {
     guardianPhone: (row.guardian_phone as string) || '',
     fatherName: (row.father_name as string) || undefined,
     motherName: (row.mother_name as string) || undefined,
+    gender: (row.gender as string) || undefined,
     profilePhoto: (row.profile_photo as string) || undefined,
     password: (row.password as string) || '',
     enrollmentYear: (row.enrollment_year as string) || '',
@@ -89,6 +100,7 @@ function rowToStudent(row: Record<string, unknown>): Student {
 function studentToRow(s: Partial<Student> & { id?: string; rollNumber?: string }) {
   return {
     ...(s.id !== undefined && { id: s.id }),
+    ...(s.collegeId !== undefined && { college_id: s.collegeId }),
     ...(s.rollNumber !== undefined && { roll_number: s.rollNumber }),
     ...(s.name !== undefined && { name: s.name }),
     ...(s.department !== undefined && { department: s.department }),
@@ -103,6 +115,7 @@ function studentToRow(s: Partial<Student> & { id?: string; rollNumber?: string }
     ...(s.guardianPhone !== undefined && { guardian_phone: s.guardianPhone }),
     ...(s.fatherName !== undefined && { father_name: s.fatherName }),
     ...(s.motherName !== undefined && { mother_name: s.motherName }),
+    ...(s.gender !== undefined && { gender: s.gender }),
     ...(s.profilePhoto !== undefined && { profile_photo: s.profilePhoto }),
     ...(s.password !== undefined && { password: s.password }),
     ...(s.enrollmentYear !== undefined && { enrollment_year: s.enrollmentYear }),
@@ -114,6 +127,7 @@ function studentToRow(s: Partial<Student> & { id?: string; rollNumber?: string }
 function rowToAttendance(row: Record<string, unknown>): AttendanceRecord {
   return {
     id: row.id as string,
+    collegeId: (row.college_id as string) || 'default-college',
     studentId: (row.student_id as string) || '',
     rollNumber: row.roll_number as string,
     studentName: (row.student_name as string) || '',
@@ -127,13 +141,13 @@ function rowToAttendance(row: Record<string, unknown>): AttendanceRecord {
     year: row.year as string | undefined,
     branch: row.branch as string | undefined,
     semesterNum: row.semester_num as string | undefined,
-    subjectName: row.subject_name as string | undefined,
   };
 }
 
 function attendanceToRow(r: Partial<AttendanceRecord> & { id?: string }) {
   return {
     ...(r.id !== undefined && { id: r.id }),
+    ...(r.collegeId !== undefined && { college_id: r.collegeId }),
     ...(r.studentId !== undefined && { student_id: r.studentId }),
     ...(r.rollNumber !== undefined && { roll_number: r.rollNumber }),
     ...(r.studentName !== undefined && { student_name: r.studentName }),
@@ -147,7 +161,6 @@ function attendanceToRow(r: Partial<AttendanceRecord> & { id?: string }) {
     ...(r.year !== undefined && { year: r.year }),
     ...(r.branch !== undefined && { branch: r.branch }),
     ...(r.semesterNum !== undefined && { semester_num: r.semesterNum }),
-    ...(r.subjectName !== undefined && { subject_name: r.subjectName }),
   };
 }
 
@@ -159,6 +172,9 @@ function attendanceToRow(r: Partial<AttendanceRecord> & { id?: string }) {
 export async function syncFromCloud(): Promise<void> {
   if (!isSupabaseConfigured || !supabase) return;
   try {
+    // 1. One-time migration: Legacy remote data should be treated as 'default-college' upon read.
+    // (Removed remote UPDATE calls that were causing 400 errors for tables missing college_id)
+
     // Pull students
     const { data: studentRows, error: se } = await supabase
       .from('students')
@@ -182,10 +198,43 @@ export async function syncFromCloud(): Promise<void> {
       .from('app_settings')
       .select('*')
       .eq('key', 'settings')
-      .single();
+      .maybeSingle();
     if (!ste && settingsRows) {
       setObject<AppSettings>(KEYS.SETTINGS, settingsRows.value as AppSettings);
     }
+
+    // Pull admin auth
+    const { data: authRows, error: authe } = await supabase
+      .from('app_settings')
+      .select('*')
+      .eq('key', 'admin_auth')
+      .maybeSingle();
+    if (!authe && authRows && authRows.value) {
+      const authVal = authRows.value as { password?: string; lastChanged?: string };
+      if (authVal.password) localStorage.setItem('vertex_admin_pwd', authVal.password);
+      if (authVal.lastChanged) localStorage.setItem('vertex_admin_pwd_changed', authVal.lastChanged);
+    }
+
+    // Pull QR sessions
+    const { data: qrRows, error: qrErr } = await supabase
+      .from('qr_sessions')
+      .select('*');
+    if (!qrErr && qrRows) {
+      const formatted = qrRows.map(r => ({
+        id: r.id,
+        collegeId: r.college_id || 'default-college',
+        year: r.year,
+        branch: r.branch,
+        semester: r.semester,
+        lectureNumber: r.lecture_number,
+        date: r.date,
+        expiresAt: r.expires_at,
+        createdBy: r.created_by,
+      }));
+      setItem(KEYS.QR_SESSIONS, formatted);
+    }
+
+    // (Removed users and colleges sync to prevent 404 console errors since tables may not exist yet)
 
     localStorage.setItem(KEYS.CLOUD_SYNCED, 'true');
     console.log('[DB] Synced from Supabase cloud.');
@@ -196,17 +245,276 @@ export async function syncFromCloud(): Promise<void> {
 
 // ─── Seed ─────────────────────────────────────────────────────────────────────
 export function seedDatabase(): void {
-  if (localStorage.getItem(KEYS.SEEDED)) return;
-  setItem<Student>(KEYS.STUDENTS, STUDENTS_DATA);
-  setObject<AppSettings>(KEYS.SETTINGS, DEFAULT_SETTINGS);
-  localStorage.setItem(KEYS.SEEDED, 'true');
-  console.log('[DB] Database seeded with 61 students.');
+  if (!localStorage.getItem(KEYS.SEEDED)) {
+    setItem<Student>(KEYS.STUDENTS, STUDENTS_DATA);
+    setObject<AppSettings>(KEYS.SETTINGS, DEFAULT_SETTINGS);
+    
+    // Seed initial users
+    const initialUsers: User[] = [
+      {
+        id: 'super-admin-1',
+        username: 'admin',
+        password: 'adminpassword',
+        role: 'superadmin',
+        name: 'System Owner',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'college-admin-1',
+        collegeId: 'default-college',
+        username: 'vertex',
+        password: 'ABDUL1234', // Legacy admin password
+        role: 'college_admin',
+        name: 'College Admin',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      }
+    ];
+    setItem<User>(KEYS.USERS, initialUsers);
+    
+    localStorage.setItem(KEYS.SEEDED, 'true');
+    console.log('[DB] Database seeded with 61 students and 3 staff users.');
+  } else {
+    // Migration: ensure superadmin and college_admin exist
+    let users = getItem<User>(KEYS.USERS);
+    let colleges = getItem<College>(KEYS.COLLEGES);
+    let changed = false;
+    
+    if (!users.some(u => u.role === 'superadmin')) {
+      users.push({
+        id: 'super-admin-1',
+        username: 'admin',
+        password: 'adminpassword',
+        role: 'superadmin',
+        name: 'System Owner',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      });
+      changed = true;
+    }
+
+    if (!users.some(u => u.role === 'college_admin')) {
+      const legacyPwd = localStorage.getItem('vertex_admin_pwd') || 'ABDUL1234';
+      users.push({
+        id: 'college-admin-1',
+        collegeId: 'default-college',
+        username: 'vertex',
+        password: legacyPwd,
+        role: 'college_admin',
+        name: 'College Admin',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      });
+      changed = true;
+    }
+    
+    if (changed) {
+      setItem<User>(KEYS.USERS, users);
+    }
+
+    if (colleges.length === 0) {
+      colleges.push({
+        id: 'default-college',
+        name: 'Vertex Institute of Technology',
+        code: 'VIT',
+        createdAt: new Date().toISOString()
+      });
+      setItem<College>(KEYS.COLLEGES, colleges);
+    }
+
+    // Legacy Data Migration: Assign all unassigned records to 'default-college'
+    let migratedData = false;
+    users = users.map(u => {
+      if (!u.collegeId && u.role !== 'superadmin') {
+        migratedData = true;
+        return { ...u, collegeId: 'default-college' };
+      }
+      return u;
+    });
+    if (migratedData) setItem<User>(KEYS.USERS, users);
+
+    let students = getItem<Student>(KEYS.STUDENTS);
+    let studentsMigrated = false;
+    students = students.map(s => {
+      if (!s.collegeId) {
+        studentsMigrated = true;
+        return { ...s, collegeId: 'default-college' };
+      }
+      return s;
+    });
+    if (studentsMigrated) setItem<Student>(KEYS.STUDENTS, students);
+
+    let attendance = getItem<AttendanceRecord>(KEYS.ATTENDANCE);
+    let attendanceMigrated = false;
+    attendance = attendance.map(a => {
+      if (!a.collegeId) {
+        attendanceMigrated = true;
+        return { ...a, collegeId: 'default-college' };
+      }
+      return a;
+    });
+    if (attendanceMigrated) setItem<AttendanceRecord>(KEYS.ATTENDANCE, attendance);
+
+    let sessions = getItem<import('../types').QrSession>(KEYS.QR_SESSIONS);
+    let sessionsMigrated = false;
+    sessions = sessions.map(s => {
+      if (!s.collegeId) {
+        sessionsMigrated = true;
+        return { ...s, collegeId: 'default-college' };
+      }
+      return s;
+    });
+    if (sessionsMigrated) setItem(KEYS.QR_SESSIONS, sessions);
+
+    let settings = getObject<AppSettings>(KEYS.SETTINGS, DEFAULT_SETTINGS);
+    if (!settings.collegeId) {
+      settings.collegeId = 'default-college';
+      setObject<AppSettings>(KEYS.SETTINGS, settings);
+    }
+  }
 }
+
+// ─── Colleges ─────────────────────────────────────────────────────────────────
+export const collegesDB = {
+  getAll(): College[] {
+    return getItem<College>(KEYS.COLLEGES);
+  },
+
+  getById(id: string): College | undefined {
+    return this.getAll().find((c) => c.id === id);
+  },
+
+  add(college: Omit<College, 'id' | 'createdAt'>): College {
+    const all = this.getAll();
+    const newCollege = { ...college, id: generateId(), createdAt: new Date().toISOString() };
+    all.push(newCollege);
+    setItem<College>(KEYS.COLLEGES, all);
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('colleges').insert({
+        id: newCollege.id,
+        name: newCollege.name,
+        code: newCollege.code,
+        logo_url: newCollege.logoUrl,
+        created_at: newCollege.createdAt
+      }).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase insert college error:', error.message);
+      });
+    }
+    return newCollege;
+  },
+
+  update(id: string, updates: Partial<College>): void {
+    const all = this.getAll();
+    const idx = all.findIndex((c) => c.id === id);
+    if (idx >= 0) {
+      all[idx] = { ...all[idx], ...updates };
+      setItem<College>(KEYS.COLLEGES, all);
+      if (isSupabaseConfigured && supabase) {
+        supabase.from('colleges').update({
+          name: updates.name,
+          code: updates.code,
+          logo_url: updates.logoUrl
+        }).eq('id', id).then(({ error }) => {
+          if (error) console.warn('[DB] Supabase update college error:', error.message);
+        });
+      }
+    }
+  },
+
+  delete(id: string): void {
+    const all = this.getAll();
+    const filtered = all.filter((c) => c.id !== id);
+    setItem<College>(KEYS.COLLEGES, filtered);
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('colleges').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase delete college error:', error.message);
+      });
+    }
+  }
+};
+
+// ─── Users (Staff) ────────────────────────────────────────────────────────────
+export const usersDB = {
+  getAll(): User[] {
+    let items = getItem<User>(KEYS.USERS);
+    const active = getActiveCollegeId();
+    if (active && active !== 'ALL') {
+      items = items.filter((u) => u.collegeId === active || u.role === 'superadmin');
+    }
+    return items;
+  },
+
+  getById(id: string): User | undefined {
+    return this.getAll().find((u) => u.id === id);
+  },
+
+  getByUsername(username: string): User | undefined {
+    return this.getAll().find((u) => u.username === username);
+  },
+
+  add(user: Omit<User, 'id'>): User {
+    const all = getItem<User>(KEYS.USERS); // Use un-filtered for adding
+    const active = getActiveCollegeId();
+    const newUser = { 
+      ...user, 
+      id: generateId(),
+      collegeId: user.collegeId || (active && active !== 'ALL' ? active : undefined)
+    };
+    all.push(newUser);
+    setItem<User>(KEYS.USERS, all);
+    if (isSupabaseConfigured && supabase) {
+      // Best effort supabase sync, might fail if table doesn't exist
+      supabase.from('users').insert(newUser).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase insert user error:', error.message);
+      });
+    }
+    return newUser;
+  },
+
+  update(id: string, updates: Partial<User>): void {
+    if (id === 'super-admin-1' && updates.role && updates.role !== 'superadmin') {
+      console.warn('[DB] Cannot change role of permanent super admin');
+      return;
+    }
+    const all = getItem<User>(KEYS.USERS);
+    const idx = all.findIndex((u) => u.id === id);
+    if (idx >= 0) {
+      all[idx] = { ...all[idx], ...updates };
+      setItem<User>(KEYS.USERS, all);
+      if (isSupabaseConfigured && supabase) {
+        supabase.from('users').update(updates).eq('id', id).then(({ error }) => {
+          if (error) console.warn('[DB] Supabase update user error:', error.message);
+        });
+      }
+    }
+  },
+
+  delete(id: string): void {
+    if (id === 'super-admin-1') {
+      console.warn('[DB] Cannot delete permanent super admin');
+      return;
+    }
+    const all = getItem<User>(KEYS.USERS);
+    const filtered = all.filter((u) => u.id !== id);
+    setItem<User>(KEYS.USERS, filtered);
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('users').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase delete user error:', error.message);
+      });
+    }
+  },
+};
 
 // ─── Students ─────────────────────────────────────────────────────────────────
 export const studentsDB = {
   getAll(): Student[] {
-    return getItem<Student>(KEYS.STUDENTS);
+    let items = getItem<Student>(KEYS.STUDENTS);
+    const active = getActiveCollegeId();
+    if (active && active !== 'ALL') {
+      items = items.filter((s) => s.collegeId === active || (!s.collegeId && active === 'default-college')); // Fallback for legacy seeded data
+    }
+    return items;
   },
 
   getById(id: string): Student | undefined {
@@ -218,8 +526,13 @@ export const studentsDB = {
   },
 
   add(student: Omit<Student, 'id'>): Student {
-    const all = this.getAll();
-    const newStudent = { ...student, id: generateId() };
+    const all = getItem<Student>(KEYS.STUDENTS);
+    const active = getActiveCollegeId();
+    const newStudent = { 
+      ...student, 
+      id: generateId(),
+      collegeId: student.collegeId || (active && active !== 'ALL' ? active : 'default-college')
+    };
     all.push(newStudent);
     setItem<Student>(KEYS.STUDENTS, all);
     // Background cloud sync
@@ -232,7 +545,7 @@ export const studentsDB = {
   },
 
   update(id: string, updates: Partial<Student>): void {
-    const all = this.getAll();
+    const all = getItem<Student>(KEYS.STUDENTS);
     const idx = all.findIndex((s) => s.id === id);
     if (idx >= 0) {
       all[idx] = { ...all[idx], ...updates };
@@ -247,7 +560,7 @@ export const studentsDB = {
   },
 
   delete(id: string): void {
-    const all = this.getAll();
+    const all = getItem<Student>(KEYS.STUDENTS);
     const filtered = all.filter((s) => s.id !== id);
     setItem<Student>(KEYS.STUDENTS, filtered);
     // Background cloud sync
@@ -262,7 +575,12 @@ export const studentsDB = {
 // ─── Attendance ───────────────────────────────────────────────────────────────
 export const attendanceDB = {
   getAll(): AttendanceRecord[] {
-    return getItem<AttendanceRecord>(KEYS.ATTENDANCE);
+    let items = getItem<AttendanceRecord>(KEYS.ATTENDANCE);
+    const active = getActiveCollegeId();
+    if (active && active !== 'ALL') {
+      items = items.filter((r) => r.collegeId === active || (!r.collegeId && active === 'default-college'));
+    }
+    return items;
   },
 
   getByDate(date: string): AttendanceRecord[] {
@@ -295,7 +613,8 @@ export const attendanceDB = {
 
   /** Save a full session — upsert each record (1 per student per session) */
   saveSession(records: Omit<AttendanceRecord, 'id' | 'timestamp'>[]): void {
-    const all = this.getAll();
+    const all = getItem<AttendanceRecord>(KEYS.ATTENDANCE);
+    const active = getActiveCollegeId();
     const now = new Date().toISOString();
     const upserted: AttendanceRecord[] = [];
 
@@ -311,7 +630,12 @@ export const attendanceDB = {
         all[idx] = { ...all[idx], ...incoming, timestamp: now };
         upserted.push(all[idx]);
       } else {
-        const rec = { ...incoming, id: generateId(), timestamp: now };
+        const rec = { 
+            ...incoming, 
+            id: generateId(), 
+            timestamp: now,
+            collegeId: incoming.collegeId || (active && active !== 'ALL' ? active : 'default-college')
+        };
         all.push(rec);
         upserted.push(rec);
       }
@@ -360,6 +684,18 @@ export const attendanceDB = {
       }
     }
   },
+
+  delete(id: string): void {
+    const all = getItem<AttendanceRecord>(KEYS.ATTENDANCE);
+    const filtered = all.filter((r) => r.id !== id);
+    setItem<AttendanceRecord>(KEYS.ATTENDANCE, filtered);
+    // Background cloud delete
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('attendance_records').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase delete attendance error:', error.message);
+      });
+    }
+  },
 };
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
@@ -384,6 +720,88 @@ export const settingsDB = {
   },
 };
 
+
+// ─── QR Sessions ──────────────────────────────────────────────────────────────
+export const qrSessionsDB = {
+  getAll(): import('../types').QrSession[] {
+    let items = getItem<import('../types').QrSession>(KEYS.QR_SESSIONS);
+    const active = getActiveCollegeId();
+    if (active && active !== 'ALL') {
+      items = items.filter((s) => s.collegeId === active || (!s.collegeId && active === 'default-college'));
+    }
+    return items;
+  },
+
+  getById(id: string): import('../types').QrSession | undefined {
+    return this.getAll().find(s => s.id === id);
+  },
+
+  add(session: import('../types').QrSession): void {
+    const all = getItem<import('../types').QrSession>(KEYS.QR_SESSIONS);
+    const active = getActiveCollegeId();
+    const newSession = {
+      ...session,
+      collegeId: session.collegeId || (active && active !== 'ALL' ? active : 'default-college')
+    };
+    all.push(newSession);
+    setItem(KEYS.QR_SESSIONS, all);
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('qr_sessions').insert({
+        id: newSession.id,
+        college_id: newSession.collegeId,
+        subject: `${newSession.year}|${newSession.branch}|${newSession.semester}`,
+        year: newSession.year,
+        branch: newSession.branch,
+        semester: newSession.semester,
+        lecture_number: newSession.lectureNumber,
+        date: newSession.date,
+        expires_at: newSession.expiresAt,
+        created_by: newSession.createdBy,
+      }).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase insert QR session error:', error.message);
+      });
+    }
+  },
+
+  async fetchSessionFromCloud(id: string): Promise<import('../types').QrSession | null> {
+    if (!isSupabaseConfigured || !supabase) {
+      console.warn('[DB] Supabase not configured. Cannot fetch session from cloud.');
+      return null;
+    }
+    console.log(`[DB] Fetching session ${id} from cloud...`);
+    const { data, error } = await supabase.from('qr_sessions').select('*').eq('id', id).maybeSingle();
+    if (error) {
+      console.error('[DB] Supabase fetch error in fetchSessionFromCloud:', error.message);
+      return null;
+    }
+    if (!data) {
+      console.warn('[DB] Session not found in cloud.');
+      return null;
+    }
+    
+    const session = {
+      id: data.id,
+      year: data.year,
+      branch: data.branch,
+      semester: data.semester,
+      lectureNumber: data.lecture_number,
+      date: data.date,
+      expiresAt: data.expires_at,
+      createdBy: data.created_by,
+    };
+    
+    // Cache it locally so subsequent lookups are fast
+    const all = this.getAll();
+    if (!all.find(s => s.id === session.id)) {
+      all.push(session);
+      setItem(KEYS.QR_SESSIONS, all);
+    }
+    
+    return session;
+  },
+};
+
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 export const authDB = {
   setToken(value: string): void {
@@ -394,6 +812,14 @@ export const authDB = {
   },
   clearToken(): void {
     localStorage.removeItem(KEYS.AUTH);
+  },
+
+  syncAdminAuth(password: string, lastChanged: string): void {
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('app_settings').upsert({ key: 'admin_auth', value: { password, lastChanged } }).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase sync admin auth error:', error.message);
+      });
+    }
   },
 
   // Student Portal Auth

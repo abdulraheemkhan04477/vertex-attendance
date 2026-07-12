@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiUser, FiLock, FiZap, FiEye, FiEyeOff } from 'react-icons/fi';
 import { useAuth } from '../hooks/useAuth';
@@ -24,10 +24,7 @@ export default function Login() {
       toast.warning('Please enter username and password');
       return;
     }
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
     const ok = login(username, password);
-    setLoading(false);
     if (!ok) {
       toast.error('Invalid credentials. Please try again.');
       setShake(true);
@@ -142,9 +139,9 @@ export default function Login() {
 
           <div className="mt-6 text-center">
             <p className="text-gray-400 text-sm mb-2">Are you a student?</p>
-            <a href="/student-login" className="text-indigo-400 hover:text-indigo-300 font-medium text-sm transition-colors">
+            <Link to="/student-login" className="text-indigo-400 hover:text-indigo-300 font-medium text-sm transition-colors">
               Go to Student Portal Login →
-            </a>
+            </Link>
           </div>
         </motion.div>
 

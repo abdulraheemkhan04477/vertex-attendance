@@ -3,25 +3,31 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   FiHome, FiClipboard, FiCalendar, FiBarChart2, FiFileText,
   FiUsers, FiSettings, FiLogOut, FiChevronLeft, FiChevronRight,
-  FiZap
+  FiZap, FiShield
 } from 'react-icons/fi';
 import { useStore } from '../../store/useStore';
 import { useAuth } from '../../hooks/useAuth';
 
 const NAV_ITEMS = [
-  { path: '/dashboard',  label: 'Dashboard',  icon: <FiHome /> },
-  { path: '/attendance', label: 'Attendance', icon: <FiClipboard /> },
-  { path: '/history',    label: 'History',    icon: <FiCalendar /> },
-  { path: '/analytics',  label: 'Analytics',  icon: <FiBarChart2 /> },
-  { path: '/reports',    label: 'Reports',    icon: <FiFileText /> },
-  { path: '/students',   label: 'Students',   icon: <FiUsers /> },
-  { path: '/settings',   label: 'Settings',   icon: <FiSettings /> },
+  { path: '/dashboard',  label: 'Dashboard',  icon: <FiHome />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
+  { path: '/attendance', label: 'Attendance', icon: <FiClipboard />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
+  { path: '/qr-attendance', label: 'QR Attendance', icon: <FiZap />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
+  { path: '/history',    label: 'History',    icon: <FiCalendar />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
+  { path: '/analytics',  label: 'Analytics',  icon: <FiBarChart2 />, roles: ['superadmin', 'college_admin', 'hod'] },
+  { path: '/reports',    label: 'Reports',    icon: <FiFileText />, roles: ['superadmin', 'college_admin', 'hod'] },
+  { path: '/students',   label: 'Students',   icon: <FiUsers />, roles: ['superadmin', 'college_admin', 'hod'] },
+  { path: '/staff',      label: 'Staff',      icon: <FiShield />, roles: ['superadmin', 'college_admin', 'hod'] },
+  { path: '/settings',   label: 'Settings',   icon: <FiSettings />, roles: ['superadmin', 'college_admin', 'hod'] },
 ];
 
 export function Sidebar() {
-  const { sidebarOpen, toggleSidebar, settings } = useStore();
+  const { sidebarOpen, toggleSidebar, settings, currentUser } = useStore();
   const { logout } = useAuth();
   const location = useLocation();
+  
+  const filteredNavItems = NAV_ITEMS.filter(item => 
+    !item.roles || (currentUser && item.roles.includes(currentUser.role))
+  );
 
   return (
     <>
@@ -88,7 +94,7 @@ export function Sidebar() {
         {/* Nav */}
         <nav className="flex-1 py-4 overflow-y-auto overflow-x-hidden">
           <div className="space-y-1 px-2">
-            {NAV_ITEMS.map((item) => {
+            {filteredNavItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <NavLink

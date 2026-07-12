@@ -11,23 +11,34 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Attendance from './pages/Attendance';
 import History from './pages/History';
+import QRAttendance from './pages/QRAttendance';
 import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
 import Students from './pages/Students';
+import Staff from './pages/Staff';
 import Settings from './pages/Settings';
 import StudentLogin from './pages/StudentLogin';
 import { StudentProtectedRoute } from './pages/StudentPortal';
 import StudentDashboard from './pages/student-portal/StudentDashboard';
+import OwnerLogin from './pages/OwnerLogin';
+import { useAuth } from './hooks/useAuth';
 
 // Protected route wrapper
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const isAuth = authService.isAuthenticated();
-  if (!isAuth) return <Navigate to="/login" replace />;
+function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
+  const { isAuthenticated, currentUser } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  
+  if (allowedRoles && currentUser) {
+    if (!allowedRoles.includes(currentUser.role)) {
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+  
   return <Layout>{children}</Layout>;
 }
 
 function AppInitializer() {
-  const { loadSettings, setAuthenticated } = useStore();
+  const { loadSettings, setAuthenticated, setCurrentUser } = useStore();
 
   useEffect(() => {
     // Seed database on first run
@@ -37,10 +48,11 @@ function AppInitializer() {
     // Restore auth
     if (authService.isAuthenticated()) {
       setAuthenticated(true);
+      setCurrentUser(authService.getCurrentUser());
     }
     // Pull latest data from Supabase (runs async, non-blocking)
     syncFromCloud();
-  }, [loadSettings, setAuthenticated]);
+  }, [loadSettings, setAuthenticated, setCurrentUser]);
 
   return null;
 }
@@ -53,15 +65,18 @@ export default function App() {
       <Routes>
         {/* Public */}
         <Route path="/login" element={<Login />} />
+        <Route path="/owner" element={<OwnerLogin />} />
 
         {/* Protected */}
         <Route path="/dashboard"  element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
-        <Route path="/history"    element={<ProtectedRoute><History /></ProtectedRoute>} />
-        <Route path="/analytics"  element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
-        <Route path="/reports"    element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-        <Route path="/students"   element={<ProtectedRoute><Students /></ProtectedRoute>} />
-        <Route path="/settings"   element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/attendance" element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod', 'teacher']}><Attendance /></ProtectedRoute>} />
+        <Route path="/qr-attendance" element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod', 'teacher']}><QRAttendance /></ProtectedRoute>} />
+        <Route path="/history"    element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod', 'teacher']}><History /></ProtectedRoute>} />
+        <Route path="/analytics"  element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Analytics /></ProtectedRoute>} />
+        <Route path="/reports"    element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Reports /></ProtectedRoute>} />
+        <Route path="/students"   element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Students /></ProtectedRoute>} />
+        <Route path="/staff"      element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Staff /></ProtectedRoute>} />
+        <Route path="/settings"   element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Settings /></ProtectedRoute>} />
 
         {/* Student Portal */}
         <Route path="/student-login" element={<StudentLogin />} />

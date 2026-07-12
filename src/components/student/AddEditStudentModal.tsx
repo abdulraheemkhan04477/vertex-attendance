@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiSave, FiCamera } from 'react-icons/fi';
 import { Button } from '../ui/Button';
 import { useToast } from '../../hooks/useToast';
+import { useStore } from '../../store/useStore';
 import { studentsDB } from '../../services/db';
 import type { Student } from '../../types';
 import { YEARS, BRANCHES, SEMESTERS_BY_YEAR } from '../../types';
@@ -22,6 +23,7 @@ const DEFAULT_FORM = {
   semester: '',
   email: '',
   phone: '',
+  gender: 'Other',
   dob: '',
   address: '',
   guardianName: '',
@@ -37,6 +39,7 @@ const DEFAULT_FORM = {
 
 export function AddEditStudentModal({ isOpen, onClose, student, onSave }: AddEditStudentModalProps) {
   const toast = useToast();
+  const { currentUser } = useStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
@@ -48,29 +51,38 @@ export function AddEditStudentModal({ isOpen, onClose, student, onSave }: AddEdi
         ...student,
         fatherName: student.fatherName ?? '',
         motherName: student.motherName ?? '',
+        gender: student.gender ?? 'Other',
         profilePhoto: student.profilePhoto ?? '',
       });
     } else {
-      setForm(DEFAULT_FORM);
+      setForm({
+        ...DEFAULT_FORM,
+        department: currentUser?.role === 'hod' && currentUser.department ? currentUser.department : DEFAULT_FORM.department,
+      });
     }
-  }, [student, isOpen]);
+  }, [student, isOpen, currentUser]);
 
-  // Update semester when year changes
+  // Update semester when year changes if the current semester is no longer valid
   useEffect(() => {
-    if (form.year && !student) {
+    if (form.year) {
       const sems = SEMESTERS_BY_YEAR[form.year];
       if (sems && sems.length > 0) {
-        setForm(prev => ({ ...prev, semester: sems[0] }));
+        setForm(prev => {
+          if (!prev.semester || !sems.includes(prev.semester)) {
+            return { ...prev, semester: sems[0] };
+          }
+          return prev;
+        });
       }
     }
-  }, [form.year, student]);
+  }, [form.year]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.rollNumber || !form.year || !form.branch || !form.semester) {
-      toast.error('Please fill all required fields');
+    if (!form.name || !form.rollNumber) {
+      toast.error('Please provide Full Name and Roll Number');
       return;
     }
 
@@ -227,9 +239,8 @@ export function AddEditStudentModal({ isOpen, onClose, student, onSave }: AddEdi
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Year *</label>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Year</label>
                       <select
-                        required
                         value={form.year}
                         onChange={(e) => setForm({ ...form, year: e.target.value })}
                         className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
@@ -238,9 +249,8 @@ export function AddEditStudentModal({ isOpen, onClose, student, onSave }: AddEdi
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Branch *</label>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Branch</label>
                       <select
-                        required
                         value={form.branch}
                         onChange={(e) => setForm({ ...form, branch: e.target.value })}
                         className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
@@ -249,9 +259,8 @@ export function AddEditStudentModal({ isOpen, onClose, student, onSave }: AddEdi
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Semester *</label>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Semester</label>
                       <select
-                        required
                         value={form.semester}
                         onChange={(e) => setForm({ ...form, semester: e.target.value })}
                         className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
@@ -293,6 +302,18 @@ export function AddEditStudentModal({ isOpen, onClose, student, onSave }: AddEdi
                         onChange={(e) => setForm({ ...form, phone: e.target.value })}
                         className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Gender</label>
+                      <select
+                        value={form.gender}
+                        onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                        className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Date of Birth</label>

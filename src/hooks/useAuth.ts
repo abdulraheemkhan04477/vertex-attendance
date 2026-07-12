@@ -5,22 +5,26 @@ import { useStore } from '../store/useStore';
 
 export function useAuth() {
   const navigate = useNavigate();
-  const { isAuthenticated, setAuthenticated } = useStore();
+  const { isAuthenticated, setAuthenticated, setCurrentUser, currentUser } = useStore();
 
   const login = useCallback(
     (username: string, password: string): boolean => {
       const ok = authService.login(username, password);
-      if (ok) setAuthenticated(true);
+      if (ok) {
+        setAuthenticated(true);
+        setCurrentUser(authService.getCurrentUser());
+      }
       return ok;
     },
-    [setAuthenticated],
+    [setAuthenticated, setCurrentUser],
   );
 
   const logout = useCallback(() => {
     authService.logout();
     setAuthenticated(false);
+    setCurrentUser(null);
     navigate('/login');
-  }, [setAuthenticated, navigate]);
+  }, [setAuthenticated, setCurrentUser, navigate]);
 
-  return { isAuthenticated, login, logout };
+  return { isAuthenticated, login, logout, currentUser };
 }

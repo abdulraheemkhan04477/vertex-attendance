@@ -1,4 +1,5 @@
 import { Outlet, Navigate, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { FiLogOut, FiZap, FiSun, FiMoon } from 'react-icons/fi';
 import { studentAuthService } from '../services/auth';
 import { useStore } from '../store/useStore';
@@ -13,7 +14,20 @@ export function StudentProtectedRoute() {
 function StudentPortalLayout() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useStore();
-  const student = studentAuthService.getCurrentStudent();
+  const [student, setStudent] = useState(studentAuthService.getCurrentStudent());
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const updated = studentAuthService.getCurrentStudent();
+      if (updated) setStudent(updated);
+    };
+    window.addEventListener('local-storage', handleStorage);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('local-storage', handleStorage);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
 
   const handleLogout = () => {
     studentAuthService.logout();

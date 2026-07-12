@@ -238,6 +238,18 @@ export function StudentProfile({ student, isOpen, onClose, isAdmin = false, onSa
                 />
               </div>
 
+              {/* Guardian's Name */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Guardian's Name</label>
+                <input
+                  type="text"
+                  value={form.guardianName ?? ''}
+                  onChange={(e) => setForm((p) => ({ ...p, guardianName: e.target.value }))}
+                  className={INPUT_CLS}
+                  placeholder="Guardian's full name"
+                />
+              </div>
+
               {/* Mother's Name */}
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Mother's Name</label>
@@ -332,6 +344,7 @@ export function StudentProfile({ student, isOpen, onClose, isAdmin = false, onSa
             {[
               { label: "Father's Name", value: student.fatherName },
               { label: "Mother's Name", value: student.motherName },
+              { label: "Guardian's Name", value: student.guardianName },
               { label: 'Date of Birth', value: student.dob },
               { label: 'Phone', value: student.phone },
               { label: 'Email', value: student.email },
@@ -409,7 +422,7 @@ export function StudentProfile({ student, isOpen, onClose, isAdmin = false, onSa
               {history.map((r) => (
                 <div key={r.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                   <div>
-                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{r.subject}</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{r.subject.replace(/\|/g, ' • ')}</span>
                     <span className="text-xs text-gray-400 ml-2">Lec {r.lectureNumber}</span>
                   </div>
                   <div className="flex items-center gap-3">

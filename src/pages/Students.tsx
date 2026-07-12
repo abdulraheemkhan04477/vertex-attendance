@@ -9,6 +9,8 @@ import { Button } from '../components/ui/Button';
 import { studentsDB } from '../services/db';
 import { attendanceService } from '../services/attendanceService';
 import { useToast } from '../hooks/useToast';
+import { useStore } from '../store/useStore';
+import { isSameDepartment } from '../utils/departmentUtils';
 import type { Student } from '../types';
 
 function getInitials(name: string): string {
@@ -23,9 +25,16 @@ const AVATAR_COLORS = [
 
 export default function Students() {
   const toast = useToast();
+  const { currentUser } = useStore();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
-  const allStudents = useMemo(() => studentsDB.getAll(), [refreshTrigger]);
+  const allStudents = useMemo(() => {
+    let list = studentsDB.getAll();
+    if (currentUser?.role === 'hod' && currentUser.department) {
+      list = list.filter(s => isSameDepartment(currentUser.department, s.department, s.branch));
+    }
+    return list.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true }));
+  }, [refreshTrigger, currentUser]);
   const allStats = useMemo(() => attendanceService.getAllStudentStats(), [refreshTrigger]);
   
   const statsMap = useMemo(() => {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiUser, FiLock, FiZap, FiEye, FiEyeOff } from 'react-icons/fi';
 import { studentAuthService } from '../services/auth';
@@ -24,10 +24,7 @@ export default function StudentLogin() {
       toast.warning('Please enter roll number and password');
       return;
     }
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
     const ok = studentAuthService.login(rollNumber, password);
-    setLoading(false);
     if (!ok) {
       toast.error('Invalid credentials');
       setShake(true);
@@ -142,9 +139,9 @@ export default function StudentLogin() {
           </form>
 
           <div className="mt-6 text-center">
-            <a href="/login" className="text-indigo-400 hover:text-indigo-300 font-medium text-sm transition-colors">
+            <Link to="/login" className="text-indigo-400 hover:text-indigo-300 font-medium text-sm transition-colors">
               ← Back to Admin Login
-            </a>
+            </Link>
           </div>
         </motion.div>
 

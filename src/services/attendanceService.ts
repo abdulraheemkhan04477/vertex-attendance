@@ -1,25 +1,48 @@
 import { attendanceDB, studentsDB } from './db';
+import { useStore } from '../store/useStore';
+import { isSameDepartment } from '../utils/departmentUtils';
 import type { AttendanceRecord, AttendanceStats, StudentAttendanceStats } from '../types';
+
+function getFilteredRecords(records: AttendanceRecord[]): AttendanceRecord[] {
+  const currentUser = useStore.getState().currentUser;
+  if (!currentUser) return records;
+
+  if (currentUser.role === 'hod' && currentUser.department) {
+    const validRollNumbers = new Set(
+      studentsDB.getAll().filter(s => isSameDepartment(currentUser.department, s.department, s.branch)).map(s => s.rollNumber)
+    );
+    return records.filter(r => validRollNumbers.has(r.rollNumber));
+  }
+  
+  if (currentUser.role === 'teacher' && currentUser.assignedClasses) {
+    const validSubjects = new Set(
+      currentUser.assignedClasses.map(c => `${c.year}|${c.branch}|${c.semester}`)
+    );
+    return records.filter(r => r.subject && validSubjects.has(r.subject));
+  }
+
+  return records;
+}
 
 export const attendanceService = {
   /** Get all records */
   getAll(): AttendanceRecord[] {
-    return attendanceDB.getAll();
+    return getFilteredRecords(attendanceDB.getAll());
   },
 
   /** Get records for a specific date */
   getByDate(date: string): AttendanceRecord[] {
-    return attendanceDB.getByDate(date);
+    return getFilteredRecords(attendanceDB.getByDate(date));
   },
 
   /** Get records for a specific session (date + subject + lecture) */
   getBySession(date: string, subject: string, lectureNumber: number): AttendanceRecord[] {
-    return attendanceDB.getBySession(date, subject, lectureNumber);
+    return getFilteredRecords(attendanceDB.getBySession(date, subject, lectureNumber));
   },
 
   /** Get a student's full attendance history */
   getStudentHistory(rollNumber: string): AttendanceRecord[] {
-    return attendanceDB.getByStudent(rollNumber);
+    return getFilteredRecords(attendanceDB.getByStudent(rollNumber));
   },
 
   /** Save a full session of records */
@@ -31,7 +54,7 @@ export const attendanceService = {
 
   /** Get overall stats across all records */
   getOverallStats(): AttendanceStats {
-    const all = attendanceDB.getAll();
+    const all = this.getAll();
     const total = all.length;
     const present = all.filter((r) => r.status === 'present').length;
     const absent = all.filter((r) => r.status === 'absent').length;
@@ -57,8 +80,16 @@ export const attendanceService = {
 
   /** Get per-student stats */
   getAllStudentStats(): StudentAttendanceStats[] {
-    const students = studentsDB.getAll();
-    const allRecords = attendanceDB.getAll();
+    let students = studentsDB.getAll();
+    const currentUser = useStore.getState().currentUser;
+    if (currentUser?.role === 'hod' && currentUser.department) {
+      students = students.filter(s => isSameDepartment(currentUser.department, s.department, s.branch));
+    } else if (currentUser?.role === 'teacher') {
+      // Teachers shouldn't really use this, but if they do, don't show all students
+      students = [];
+    }
+
+    const allRecords = this.getAll();
 
     return students.map((student) => {
       const records = allRecords.filter((r) => r.rollNumber === student.rollNumber);
@@ -90,19 +121,19 @@ export const attendanceService = {
 
   /** Get unique dates that have attendance records */
   getUniqueDates(): string[] {
-    const all = attendanceDB.getAll();
-    return [...new Set(all.map((r) => r.date))].sort().reverse();
+    const all = this.getAll();
+    return (Array.from(new Set(all.map((r) => r.date))) as string[]).sort().reverse();
   },
 
   /** Get unique subjects */
   getUniqueSubjects(): string[] {
-    const all = attendanceDB.getAll();
-    return [...new Set(all.map((r) => r.subject))].sort();
+    const all = this.getAll();
+    return (Array.from(new Set(all.map((r) => r.subject))) as string[]).sort();
   },
 
   /** Get unique sessions (date + subject + lectureNumber) */
   getUniqueSessions(): { date: string; subject: string; lectureNumber: number; faculty: string }[] {
-    const all = attendanceDB.getAll();
+    const all = this.getAll();
     const sessionMap = new Map<string, { date: string; subject: string; lectureNumber: number; faculty: string }>();
     all.forEach((r) => {
       const key = `${r.date}_${r.subject}_${r.lectureNumber}`;
@@ -122,7 +153,7 @@ export const attendanceService = {
 
   /** Monthly stats for bar chart */
   getMonthlyStats(): { month: string; present: number; absent: number; late: number; leave: number }[] {
-    const all = attendanceDB.getAll();
+    const all = this.getAll();
     const monthMap = new Map<string, { present: number; absent: number; late: number; leave: number }>();
 
     all.forEach((r) => {
@@ -158,7 +189,7 @@ export const attendanceService = {
   getRecentSessions(limit = 10): { date: string; subject: string; lectureNumber: number; faculty: string; count: number }[] {
     const sessions = this.getUniqueSessions().slice(0, limit);
     return sessions.map((s) => {
-      const records = attendanceDB.getBySession(s.date, s.subject, s.lectureNumber);
+      const records = this.getBySession(s.date, s.subject, s.lectureNumber);
       return { ...s, count: records.length };
     });
   },

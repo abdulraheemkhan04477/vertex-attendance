@@ -1,24 +1,35 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { FiDownload, FiFileText, FiCalendar, FiPrinter } from 'react-icons/fi';
+import { FiDownload, FiFileText, FiCalendar, FiPrinter, FiFilter } from 'react-icons/fi';
 import { Button } from '../components/ui/Button';
 import { attendanceService } from '../services/attendanceService';
-import { exportToCSV, exportToExcel, exportToPDF, exportStudentReportToExcel, exportStudentReportToPDF, printAttendance } from '../services/exportService';
+import { studentsDB } from '../services/db';
+import { exportSummaryToCSV, exportSummaryToExcel, exportSummaryToPDF, printSummary } from '../services/exportService';
 import { formatDate, today, getMonthRange } from '../utils/dateUtils';
-import { format, startOfWeek, endOfWeek, subWeeks, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { useToast } from '../hooks/useToast';
+import { useStore } from '../store/useStore';
+import { isSameDepartment } from '../utils/departmentUtils';
+import { YEARS, BRANCHES, SEMESTERS_BY_YEAR } from '../types';
 
 type ReportType = 'daily' | 'weekly' | 'monthly' | 'semester';
 
 export default function Reports() {
   const toast = useToast();
+  const { currentUser } = useStore();
   const todayStr = today();
   const [activeReport, setActiveReport] = useState<ReportType>('daily');
   const [customDate, setCustomDate] = useState(todayStr);
   const [customMonth, setCustomMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [loading, setLoading] = useState<string | null>(null);
 
-  const getRecords = () => {
+  // Filters
+  const [filterBranch, setFilterBranch] = useState('');
+  const [filterYear, setFilterYear] = useState('');
+  const [filterSemester, setFilterSemester] = useState('');
+  const [filterSection, setFilterSection] = useState('');
+
+  const records = useMemo(() => {
     switch (activeReport) {
       case 'daily':
         return attendanceService.getByDate(customDate);
@@ -36,48 +47,71 @@ export default function Reports() {
       case 'semester':
         return attendanceService.getAll();
     }
-  };
+  }, [activeReport, customDate, customMonth]);
 
-  const records = useMemo(getRecords, [activeReport, customDate, customMonth]);
-  const allStudentStats = useMemo(() => attendanceService.getAllStudentStats(), []);
+  const filteredStudents = useMemo(() => {
+    let list = studentsDB.getAll();
+    if (currentUser?.role === 'hod' && currentUser.department) {
+      list = list.filter(s => isSameDepartment(currentUser.department, s.department, s.branch));
+    }
+    if (filterBranch) list = list.filter(s => s.branch === filterBranch);
+    if (filterYear) list = list.filter(s => s.year === filterYear);
+    if (filterSemester) list = list.filter(s => s.semester === filterSemester);
+    if (filterSection) list = list.filter(s => s.section === filterSection);
+    return list;
+  }, [currentUser, filterBranch, filterYear, filterSemester, filterSection]);
+
+  const reportStats = useMemo(() => {
+    return filteredStudents.map((student) => {
+      const stRecords = records.filter((r) => r.rollNumber === student.rollNumber);
+      const total = stRecords.length;
+      const present = stRecords.filter((r) => r.status === 'present').length;
+      const absent = stRecords.filter((r) => r.status === 'absent').length;
+      const late = stRecords.filter((r) => r.status === 'late').length;
+      const leave = stRecords.filter((r) => r.status === 'leave').length;
+      const attended = present + late;
+      const percentage = total > 0 ? Math.round((attended / total) * 100) : 0;
+      return { student, total, present, absent, late, leave, percentage };
+    }).filter(s => s.total > 0 || activeReport === 'semester'); // only show students who have records, except for semester where we show all
+  }, [filteredStudents, records, activeReport]);
 
   const getTitle = () => {
     switch (activeReport) {
-      case 'daily':   return `Daily Attendance Report — ${formatDate(customDate)}`;
-      case 'weekly':  return `Weekly Attendance Report — Week of ${formatDate(customDate)}`;
-      case 'monthly': return `Monthly Attendance Report — ${format(new Date(customMonth + '-01'), 'MMMM yyyy')}`;
-      case 'semester': return 'Semester Attendance Report';
+      case 'daily':   return `Daily Attendance Summary — ${formatDate(customDate)}`;
+      case 'weekly':  return `Weekly Attendance Summary — Week of ${formatDate(customDate)}`;
+      case 'monthly': return `Monthly Attendance Summary — ${format(new Date(customMonth + '-01'), 'MMMM yyyy')}`;
+      case 'semester': return 'Semester Attendance Summary';
     }
   };
 
   const getFilename = () => {
     switch (activeReport) {
-      case 'daily':   return `Daily_Report_${customDate}`;
-      case 'weekly':  return `Weekly_Report_${customDate}`;
-      case 'monthly': return `Monthly_Report_${customMonth}`;
-      case 'semester': return 'Semester_Report';
+      case 'daily':   return `Daily_Summary_${customDate}`;
+      case 'weekly':  return `Weekly_Summary_${customDate}`;
+      case 'monthly': return `Monthly_Summary_${customMonth}`;
+      case 'semester': return 'Semester_Summary';
     }
   };
 
-  const doExport = async (type: 'csv' | 'excel' | 'pdf' | 'print' | 'student-excel' | 'student-pdf') => {
+  const doExport = async (type: 'csv' | 'excel' | 'pdf' | 'print') => {
     setLoading(type);
     await new Promise((r) => setTimeout(r, 300));
     const title = getTitle();
     const filename = getFilename();
 
     try {
-      if (type === 'csv') exportToCSV(records, filename);
-      else if (type === 'excel') exportToExcel(records, filename);
-      else if (type === 'pdf') exportToPDF(records, title);
-      else if (type === 'print') printAttendance(records, title);
-      else if (type === 'student-excel') exportStudentReportToExcel(allStudentStats, `Student_Report_${filename}`);
-      else if (type === 'student-pdf') exportStudentReportToPDF(allStudentStats, `Student Summary — ${title}`);
+      if (type === 'csv') exportSummaryToCSV(reportStats, filename);
+      else if (type === 'excel') exportSummaryToExcel(reportStats, filename);
+      else if (type === 'pdf') exportSummaryToPDF(reportStats, title);
+      else if (type === 'print') printSummary(reportStats, title);
       toast.success('Report generated successfully!');
     } catch {
       toast.error('Failed to generate report');
     }
     setLoading(null);
   };
+
+  const availableSemesters = filterYear ? SEMESTERS_BY_YEAR[filterYear] || [] : Object.values(SEMESTERS_BY_YEAR).flat();
 
   return (
     <div className="space-y-5">
@@ -109,7 +143,7 @@ export default function Reports() {
         </div>
 
         {/* Date selectors */}
-        <div className="flex flex-wrap gap-3 items-end">
+        <div className="flex flex-wrap gap-3 items-end mb-5">
           {(activeReport === 'daily' || activeReport === 'weekly') && (
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
@@ -135,6 +169,58 @@ export default function Reports() {
             </div>
           )}
         </div>
+        
+        {/* Filters */}
+        <div className="border-t border-gray-100 dark:border-gray-700 pt-4 mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <FiFilter className="text-gray-400" />
+            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Filter Students</h4>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <select
+                value={filterBranch}
+                onChange={(e) => setFilterBranch(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-gray-900 dark:text-white"
+              >
+                <option value="">All Branches</option>
+                {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <div>
+              <select
+                value={filterYear}
+                onChange={(e) => setFilterYear(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-gray-900 dark:text-white"
+              >
+                <option value="">All Years</option>
+                {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+            <div>
+              <select
+                value={filterSemester}
+                onChange={(e) => setFilterSemester(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-gray-900 dark:text-white"
+              >
+                <option value="">All Semesters</option>
+                {Array.from(new Set(availableSemesters)).map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <select
+                value={filterSection}
+                onChange={(e) => setFilterSection(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl outline-none text-gray-900 dark:text-white"
+              >
+                <option value="">All Sections</option>
+                <option value="A">Section A</option>
+                <option value="B">Section B</option>
+                <option value="C">Section C</option>
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Report Preview */}
@@ -142,83 +228,79 @@ export default function Reports() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-base font-bold text-gray-800 dark:text-white">{getTitle()}</h3>
-            <p className="text-sm text-gray-400 mt-0.5">{records.length} attendance records found</p>
+            <p className="text-sm text-gray-400 mt-0.5">{reportStats.length} students included in summary</p>
           </div>
           <span className="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-full font-semibold">
-            {records.length} records
+            {reportStats.length} Students
           </span>
         </div>
 
         {/* Export Buttons */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           {[
             { id: 'csv' as const, icon: '📄', label: 'Export CSV', color: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400' },
             { id: 'excel' as const, icon: '📊', label: 'Export Excel', color: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400' },
             { id: 'pdf' as const, icon: '📕', label: 'Export PDF', color: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400' },
             { id: 'print' as const, icon: '🖨', label: 'Print Report', color: 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300' },
-            { id: 'student-excel' as const, icon: '📈', label: 'Student Summary Excel', color: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400' },
-            { id: 'student-pdf' as const, icon: '📑', label: 'Student Summary PDF', color: 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-400' },
           ].map(({ id, icon, label, color }) => (
-            <motion.button
+            <button
               key={id}
-              whileTap={{ scale: 0.97 }}
               onClick={() => doExport(id)}
-              disabled={!!loading}
-              className={`flex items-center gap-3 px-4 py-3 border rounded-xl font-semibold text-sm transition-all hover:shadow-sm disabled:opacity-50 ${color}`}
+              disabled={loading !== null || reportStats.length === 0}
+              className={`flex items-center justify-center gap-2 p-3 rounded-xl border ${color} hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              <span className="text-xl">{loading === id ? '⏳' : icon}</span>
-              <span>{loading === id ? 'Generating...' : label}</span>
-            </motion.button>
+              <span className="text-lg">{icon}</span>
+              <span className="text-sm font-semibold">{loading === id ? '...' : label}</span>
+            </button>
           ))}
         </div>
 
-        {/* Preview Table */}
-        {records.length > 0 ? (
-          <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-700">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-700/60">
-                  {['#', 'Roll No.', 'Name', 'Date', 'Subject', 'Faculty', 'Lec', 'Status'].map((h) => (
-                    <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
-                  ))}
+        <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-700">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50 dark:bg-gray-900/50 text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold border-b border-gray-100 dark:border-gray-700">
+                <th className="p-3">Roll No</th>
+                <th className="p-3">Name</th>
+                <th className="p-3">Branch</th>
+                <th className="p-3">Total Days</th>
+                <th className="p-3">Present</th>
+                <th className="p-3">Absent</th>
+                <th className="p-3 text-right">Attendance %</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {reportStats.slice(0, 5).map((s, i) => (
+                <tr key={i} className="text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <td className="p-3 font-medium">{s.student.rollNumber}</td>
+                  <td className="p-3">{s.student.name}</td>
+                  <td className="p-3">{s.student.branch}</td>
+                  <td className="p-3 text-center">{s.total}</td>
+                  <td className="p-3 text-center text-green-600 font-medium">{s.present}</td>
+                  <td className="p-3 text-center text-red-600 font-medium">{s.absent}</td>
+                  <td className="p-3 text-right">
+                    <span className={`px-2 py-1 rounded-md font-bold ${s.percentage >= 75 ? 'bg-green-100 text-green-700 dark:bg-green-900/30' : 'bg-red-100 text-red-700 dark:bg-red-900/30'}`}>
+                      {s.percentage}%
+                    </span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {records.slice(0, 10).map((r, i) => (
-                  <tr key={r.id || i} className="border-t border-gray-50 dark:border-gray-700">
-                    <td className="px-4 py-2 text-xs text-gray-400">{i + 1}</td>
-                    <td className="px-4 py-2 text-xs font-mono text-indigo-600 dark:text-indigo-400">{r.rollNumber}</td>
-                    <td className="px-4 py-2 text-sm font-medium text-gray-800 dark:text-gray-200">{r.studentName}</td>
-                    <td className="px-4 py-2 text-xs text-gray-500">{formatDate(r.date)}</td>
-                    <td className="px-4 py-2 text-xs text-gray-500">{r.subject}</td>
-                    <td className="px-4 py-2 text-xs text-gray-500">{r.faculty}</td>
-                    <td className="px-4 py-2 text-xs text-gray-500">{r.lectureNumber}</td>
-                    <td className="px-4 py-2">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full
-                        ${r.status === 'present' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : ''}
-                        ${r.status === 'absent'  ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'     : ''}
-                        ${r.status === 'late'    ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : ''}
-                        ${r.status === 'leave'   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'   : ''}
-                      `}>
-                        {r.status.toUpperCase()}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {records.length > 10 && (
-              <div className="px-4 py-2 text-xs text-gray-400 bg-gray-50 dark:bg-gray-700/30 border-t border-gray-100 dark:border-gray-700">
-                ... and {records.length - 10} more records (included in export)
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="py-12 text-center">
-            <FiFileText className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-            <p className="text-sm text-gray-400">No records found for the selected period</p>
-          </div>
-        )}
+              ))}
+              {reportStats.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-gray-500">
+                    No records found for the selected filters and date range.
+                  </td>
+                </tr>
+              )}
+              {reportStats.length > 5 && (
+                <tr>
+                  <td colSpan={7} className="p-3 text-center text-xs text-gray-400 bg-gray-50/50 dark:bg-gray-900/20">
+                    Showing 5 of {reportStats.length} students. Export to see full list.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
