@@ -18,7 +18,6 @@ export const authService = {
     localStorage.setItem('vertex_admin_pwd', newPassword);
     localStorage.setItem('vertex_admin_pwd_changed', lastChanged);
     authDB.syncAdminAuth(newPassword, lastChanged);
-    
     const user = this.getCurrentUser();
     if (user) {
       usersDB.update(user.id, { password: newPassword });

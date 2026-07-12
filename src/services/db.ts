@@ -235,7 +235,6 @@ export async function syncFromCloud(): Promise<void> {
     }
 
     // (Removed users and colleges sync to prevent 404 console errors since tables may not exist yet)
-
     localStorage.setItem(KEYS.CLOUD_SYNCED, 'true');
     console.log('[DB] Synced from Supabase cloud.');
   } catch (err) {

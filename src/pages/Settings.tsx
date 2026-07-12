@@ -219,7 +219,7 @@ export default function Settings() {
               value={form.address || ''}
               onChange={(e) => handleChange('address', e.target.value)}
               className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
-              placeholder="Full address of the college"
+              placeholder="e.g. 123 Education Street, Tech City"
             />
           </div>
           <div className="md:col-span-2">
@@ -248,6 +248,7 @@ export default function Settings() {
             <FiSun className="text-indigo-600 dark:text-indigo-400 w-5 h-5" />
             <h3 className="text-base font-bold text-gray-800 dark:text-white">Appearance</h3>
           </div>
+
           <div className="p-6">
             <div className="flex gap-3">
               <button

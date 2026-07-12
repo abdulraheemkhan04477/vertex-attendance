@@ -42,21 +42,21 @@ export default function StudentDashboard() {
     };
   }, []);
 
+  const history = useMemo(() => {
+    return student ? attendanceService.getStudentHistory(student.rollNumber) : [];
+  }, [student?.rollNumber]);
+  
+  const stats = useMemo(() => {
+    const s = student ? attendanceService.getStudentStats(student.rollNumber) : null;
+    return s || { present: 0, absent: 0, late: 0, leave: 0, total: 0, percentage: 0 };
+  }, [student?.rollNumber, history.length]);
   if (!student) return null;
 
   const handleProfileUpdate = () => {
     setStudent(studentAuthService.getCurrentStudent());
   };
 
-  const history = useMemo(() => attendanceService.getStudentHistory(student.rollNumber), [student.rollNumber]);
-  
-  // Calculate stats
-  const total = history.length;
-  const present = history.filter((r) => r.status === 'present').length;
-  const absent = history.filter((r) => r.status === 'absent').length;
-  const late = history.filter((r) => r.status === 'late').length;
-  const leave = history.filter((r) => r.status === 'leave').length;
-  const percentage = total === 0 ? 0 : Math.round((present / total) * 100);
+  const { present, absent, late, leave, total, percentage } = stats;
 
   // Take recent 30 records
   const recentHistory = [...history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 30);
