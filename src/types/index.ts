@@ -95,6 +95,7 @@ export interface AppSettings {
   collegeId?: string;
   // Branding
   logoUrl?: string;
+  shortName?: string;
   collegeLogo?: string;
   loginLogo?: string;
   dashboardLogo?: string;
@@ -103,6 +104,47 @@ export interface AppSettings {
   website?: string;
   address?: string;
   supportEmail?: string;
+  whatsappNumber?: string; // New field
+  // Preferences
+  language?: string;
+  dateFormat?: string;
+  timeFormat?: string;
+  autoLogoutTimer?: number; // In minutes
+  dashboardDefaultPage?: string;
+}
+
+export interface LeaveRequest {
+  id: string;
+  studentId: string;
+  rollNumber: string;
+  studentName: string;
+  collegeId: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  documentUrl?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  appliedAt: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+}
+
+export interface Session {
+  id: string;
+  userId: string;
+  device: string;
+  ip: string;
+  lastActive: string;
+  isCurrent: boolean;
+}
+
+export interface LoginHistory {
+  id: string;
+  userId: string;
+  timestamp: string;
+  device: string;
+  ip: string;
+  status: 'success' | 'failed';
 }
 
 export interface AttendanceStats {

@@ -21,6 +21,8 @@ import StudentLogin from './pages/StudentLogin';
 import { StudentProtectedRoute } from './pages/StudentPortal';
 import StudentDashboard from './pages/student-portal/StudentDashboard';
 import OwnerLogin from './pages/OwnerLogin';
+import Leaves from './pages/Leaves';
+import LeaveApply from './pages/student-portal/LeaveApply';
 import { useAuth } from './hooks/useAuth';
 
 // Protected route wrapper
@@ -38,7 +40,11 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
 }
 
 function AppInitializer() {
-  const { loadSettings, setAuthenticated, setCurrentUser } = useStore();
+  const { loadSettings, setAuthenticated, setCurrentUser, settings } = useStore();
+
+  useEffect(() => {
+    document.title = settings?.instituteName || 'Attendance System';
+  }, [settings?.instituteName]);
 
   useEffect(() => {
     // Seed database on first run
@@ -77,11 +83,13 @@ export default function App() {
         <Route path="/students"   element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Students /></ProtectedRoute>} />
         <Route path="/staff"      element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Staff /></ProtectedRoute>} />
         <Route path="/settings"   element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Settings /></ProtectedRoute>} />
+        <Route path="/leaves"     element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Leaves /></ProtectedRoute>} />
 
         {/* Student Portal */}
         <Route path="/student-login" element={<StudentLogin />} />
         <Route path="/student" element={<StudentProtectedRoute />}>
           <Route path="dashboard" element={<StudentDashboard />} />
+          <Route path="leaves" element={<LeaveApply />} />
           <Route index element={<Navigate to="/student/dashboard" replace />} />
         </Route>
 

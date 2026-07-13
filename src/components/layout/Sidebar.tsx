@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { path: '/attendance', label: 'Attendance', icon: <FiClipboard />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
   { path: '/qr-attendance', label: 'QR Attendance', icon: <FiZap />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
   { path: '/history',    label: 'History',    icon: <FiCalendar />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
+  { path: '/leaves',     label: 'Leaves',     icon: <FiFileText />, roles: ['superadmin', 'college_admin', 'hod'] },
   { path: '/analytics',  label: 'Analytics',  icon: <FiBarChart2 />, roles: ['superadmin', 'college_admin', 'hod'] },
   { path: '/reports',    label: 'Reports',    icon: <FiFileText />, roles: ['superadmin', 'college_admin', 'hod'] },
   { path: '/students',   label: 'Students',   icon: <FiUsers />, roles: ['superadmin', 'college_admin', 'hod'] },
@@ -60,12 +61,12 @@ export function Sidebar() {
                 exit={{ opacity: 0, x: -10 }}
                 className="flex items-center gap-2 flex-1 min-w-0"
               >
-                <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
-                  <FiZap className="w-4 h-4 text-white" />
+                <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-cover"/> : <FiShield className="w-4 h-4 text-white" />}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-white text-sm font-bold truncate">Vertex</p>
-                  <p className="text-gray-400 text-xs truncate">Attendance System</p>
+                  <p className="text-white text-sm font-bold truncate">{settings.instituteName || 'Attendance System'}</p>
+                  <p className="text-gray-400 text-xs truncate">{settings.shortName || 'Management System'}</p>
                 </div>
               </motion.div>
             ) : (
@@ -74,9 +75,9 @@ export function Sidebar() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center mx-auto"
+                className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center mx-auto overflow-hidden"
               >
-                <FiZap className="w-4 h-4 text-white" />
+                {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-cover"/> : <FiShield className="w-4 h-4 text-white" />}
               </motion.div>
             )}
           </AnimatePresence>

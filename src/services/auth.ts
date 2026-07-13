@@ -1,27 +1,11 @@
 import { authDB, studentsDB, usersDB } from './db';
 import type { Student, User } from '../types';
 import { useStore } from '../store/useStore';
+import { isSupabaseConfigured, supabase } from './supabase';
 
 export const authService = {
-  getAdminPassword(): string {
-    const user = this.getCurrentUser();
-    if (user) return user.password || '';
-    return localStorage.getItem('vertex_admin_pwd') || 'ABDUL1234';
-  },
-
   getLastPasswordChange(): string | null {
     return localStorage.getItem('vertex_admin_pwd_changed');
-  },
-
-  updateAdminPassword(newPassword: string): void {
-    const lastChanged = new Date().toISOString();
-    localStorage.setItem('vertex_admin_pwd', newPassword);
-    localStorage.setItem('vertex_admin_pwd_changed', lastChanged);
-    authDB.syncAdminAuth(newPassword, lastChanged);
-    const user = this.getCurrentUser();
-    if (user) {
-      usersDB.update(user.id, { password: newPassword });
-    }
   },
 
   login(username: string, password: string): boolean {
@@ -47,18 +31,12 @@ export const authService = {
 
   isAuthenticated(): boolean {
     const token = authDB.getToken();
-    // Support legacy token fallback for college admin temporarily if needed
-    if (token === 'vertex_admin_v1') return true; 
     return !!token && !!usersDB.getById(token);
   },
 
   getCurrentUser(): User | null {
     const token = authDB.getToken();
     if (!token) return null;
-    // Map legacy token to college_admin
-    if (token === 'vertex_admin_v1') {
-      return usersDB.getById('college-admin-1') || null;
-    }
     return usersDB.getById(token) || null;
   }
 };
@@ -92,11 +70,6 @@ export const studentAuthService = {
   async getFreshCurrentStudent(): Promise<Student | null> {
     const rollNumber = authDB.getStudentToken();
     if (!rollNumber) return null;
-    
-    // We import these dynamically to avoid circular dependencies and TS require errors
-    const { isSupabaseConfigured, supabase } = await import('./supabase');
-    const { studentsDB } = await import('./db');
-    
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase

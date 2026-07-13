@@ -9,6 +9,7 @@ import { authService } from '../services/auth';
 import { usersDB } from '../services/db';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../hooks/useAuth';
+import { sessionsDB } from '../services/db';
 
 export default function Settings() {
   const { settings, updateSettings, theme, toggleTheme, currentUser, setCurrentUser } = useStore();
@@ -22,7 +23,7 @@ export default function Settings() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const lastChanged = authService.getLastPasswordChange();
 
-  const handleChange = (key: keyof AppSettings, value: string) => {
+  const handleChange = (key: keyof AppSettings, value: string | number) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -58,12 +59,22 @@ export default function Settings() {
       toast.error('New passwords do not match');
       return;
     }
-    if (passwordForm.current !== authService.getAdminPassword()) {
-      toast.error('Current password is incorrect');
-      return;
+    if (currentUser) {
+      if (passwordForm.current !== currentUser.password) {
+        toast.error('Current password is incorrect');
+        return;
+      }
+      usersDB.update(currentUser.id, { password: passwordForm.new });
+      
+      // Keep cloud synced for admin
+      if (currentUser.role === 'superadmin' || currentUser.role === 'college_admin') {
+        const { authDB } = await import('../services/db');
+        authDB.syncAdminAuth(passwordForm.new, new Date().toISOString());
+      }
+      
+      // Update local state so subsequent changes work without refresh
+      setCurrentUser({ ...currentUser, password: passwordForm.new });
     }
-    setPasswordSaving(true);
-    authService.updateAdminPassword(passwordForm.new);
     setPasswordSaving(false);
     setIsPasswordModalOpen(false);
     setPasswordForm({ current: '', new: '', confirm: '' });
@@ -236,6 +247,43 @@ export default function Settings() {
       </motion.div>
       )}
 
+      {/* Branding Settings (Super Admin only) */}
+      {currentUser?.role === 'superadmin' && (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.09 }}
+        className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden"
+      >
+        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+          <FiSun className="text-indigo-600 dark:text-indigo-400 w-5 h-5" />
+          <h3 className="text-base font-bold text-gray-800 dark:text-white">Application Branding</h3>
+        </div>
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">Short Name (e.g. V-Attend)</label>
+            <input
+              type="text"
+              value={form.shortName || ''}
+              onChange={(e) => handleChange('shortName', e.target.value)}
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
+              placeholder="Short application name"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">Application Logo URL (Base64 or Link)</label>
+            <input
+              type="text"
+              value={form.logoUrl || ''}
+              onChange={(e) => handleChange('logoUrl', e.target.value)}
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
+              placeholder="https://..."
+            />
+          </div>
+        </div>
+      </motion.div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Theme Toggle */}
         <motion.div
@@ -273,7 +321,7 @@ export default function Settings() {
           </div>
         </motion.div>
 
-        {/* Preferences - Removed fake email notifications and push alerts */}
+        {/* Preferences */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -285,11 +333,46 @@ export default function Settings() {
             <h3 className="text-base font-bold text-gray-800 dark:text-white">Preferences</h3>
           </div>
           <div className="p-6">
-            <p className="text-sm text-gray-500">No preference settings available at this time.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">Language</label>
+                <select
+                  value={form.language || 'English'}
+                  onChange={(e) => handleChange('language', e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
+                >
+                  <option value="English">English</option>
+                  <option value="Hindi">Hindi</option>
+                  <option value="Urdu">Urdu</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">Date Format</label>
+                <select
+                  value={form.dateFormat || 'MM/DD/YYYY'}
+                  onChange={(e) => handleChange('dateFormat', e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
+                >
+                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">Time Format</label>
+                <select
+                  value={form.timeFormat || '12h'}
+                  onChange={(e) => handleChange('timeFormat', e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
+                >
+                  <option value="12h">12-hour</option>
+                  <option value="24h">24-hour</option>
+                </select>
+              </div>
+            </div>
           </div>
         </motion.div>
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Security / Password */}
         <motion.div
@@ -302,13 +385,16 @@ export default function Settings() {
             <FiShield className="text-indigo-600 dark:text-indigo-400 w-5 h-5" />
             <h3 className="text-base font-bold text-gray-800 dark:text-white">Security</h3>
           </div>
-          <div className="p-6">
-            <Button onClick={() => setIsPasswordModalOpen(true)} variant="outline" className="w-full justify-center">
-              Change Password
-            </Button>
-            <p className="text-xs text-gray-500 mt-3 text-center">
-              {lastChanged ? `Last changed ${formatDistanceToNow(new Date(lastChanged))} ago` : 'Never changed'}
-            </p>
+          <div className="p-6 space-y-4">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <p className="text-sm font-medium text-gray-800 dark:text-white">Account Password</p>
+                <p className="text-xs text-gray-500">Last changed: {lastChanged ? formatDistanceToNow(new Date(lastChanged)) + ' ago' : 'Never'}</p>
+              </div>
+              <Button onClick={() => setIsPasswordModalOpen(true)} variant="outline" size="sm">
+                Change
+              </Button>
+            </div>
           </div>
         </motion.div>
         
@@ -317,17 +403,21 @@ export default function Settings() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
-          className="bg-gradient-to-r from-indigo-600 to-purple-700 rounded-2xl p-6 text-white flex flex-col justify-between"
+          className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden"
         >
-          <div>
-            <h3 className="font-bold text-lg mb-1">{settings.instituteName || 'Vertex Attendance System'}</h3>
-            <p className="text-indigo-200 text-sm">Version 2.0.0 • Production Build</p>
-            <p className="text-indigo-300 text-xs mt-2">© 2026 Vertex Technologies</p>
+          <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+            <FiInfo className="text-indigo-600 dark:text-indigo-400 w-5 h-5" />
+            <h3 className="text-base font-bold text-gray-800 dark:text-white">About System</h3>
           </div>
-          <div className="mt-4 pt-4 border-t border-white/20 flex items-center gap-3">
-            <Button onClick={() => window.open(`mailto:${settings.supportEmail || 'zuneydkhan04477@gmail.com'}`)} className="bg-white/10 hover:bg-white/20 text-white border-none" size="sm" icon={<FiMail />}>
-              Contact Support
-            </Button>
+          <div className="p-6">
+            <h3 className="font-bold text-lg text-gray-800 dark:text-white mb-1">{settings.instituteName || 'Vertex Attendance System'}</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Version 2.0.0 • Production Build</p>
+            <p className="text-gray-400 dark:text-gray-500 text-xs mt-2">© 2026 {settings.shortName || 'Vertex Technologies'}</p>
+            <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700 flex gap-3">
+              <Button onClick={() => window.open(`mailto:${settings.supportEmail || 'zuneydkhan04477@gmail.com'}`)} variant="outline" className="flex-1 justify-center" icon={<FiMail />}>
+                Contact Support
+              </Button>
+            </div>
           </div>
         </motion.div>
       </div>

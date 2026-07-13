@@ -28,7 +28,7 @@ export function Header() {
     return () => clearInterval(t);
   }, []);
 
-  const title = PAGE_TITLES[location.pathname] ?? 'Vertex';
+  const title = PAGE_TITLES[location.pathname] ?? (settings?.shortName || 'App');
 
   return (
     <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex items-center px-4 gap-4 flex-shrink-0 shadow-sm">

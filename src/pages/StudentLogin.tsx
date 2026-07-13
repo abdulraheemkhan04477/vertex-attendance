@@ -61,11 +61,19 @@ export default function StudentLogin() {
           transition={{ duration: 0.6 }}
           className="text-center mb-8"
         >
-          <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl shadow-indigo-900/50">
-            <FiZap className="w-10 h-10 text-white" />
+          <div className="flex flex-col items-center mb-8">
+            {settings.logoUrl ? (
+              <img src={settings.logoUrl} alt="Logo" className="w-16 h-16 rounded-2xl mb-4 shadow-sm object-cover" />
+            ) : (
+              <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/50 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+                <FiZap className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+              </div>
+            )}
+            <h1 className="text-2xl font-bold text-white text-center">
+              {settings.instituteName || 'Attendance System'}
+            </h1>
+            <p className="text-indigo-300 text-sm mt-1">Student Portal</p>
           </div>
-          <h1 className="text-2xl font-black text-white mb-1">{settings.instituteName}</h1>
-          <p className="text-indigo-300 text-sm">Student Portal</p>
         </motion.div>
 
         {/* Card */}

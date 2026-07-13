@@ -4,9 +4,9 @@ import { FiZap, FiRefreshCw, FiXCircle } from 'react-icons/fi';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../hooks/useToast';
 import { today } from '../utils/dateUtils';
-import { YEARS, BRANCHES, SEMESTERS_BY_YEAR } from '../types';
 import { useStore } from '../store/useStore';
 import { QRCodeSVG } from 'qrcode.react';
+import { studentsDB, qrSessionsDB, usersDB } from '../services/db';
 
 export default function QRAttendance() {
   const toast = useToast();
@@ -18,13 +18,34 @@ export default function QRAttendance() {
   const [semester, setSemester] = useState('');
   const [lectureNumber, setLectureNumber] = useState(1);
 
-  const availableSemesters = year ? SEMESTERS_BY_YEAR[year] || [] : [];
+  // Dynamically compute options from existing students AND teachers in the current college
+  const allStudents = useMemo(() => studentsDB.getAll(), []);
+  const allTeachers = useMemo(() => usersDB.getAll().filter(u => u.role === 'teacher' && u.assignedClasses), []);
+
+  const combinedClasses = useMemo(() => {
+    const studentClasses = allStudents.map(s => ({ year: s.year, branch: s.branch, semester: s.semester }));
+    const teacherClassesList = allTeachers.flatMap(t => t.assignedClasses || []);
+    return [...studentClasses, ...teacherClassesList];
+  }, [allStudents, allTeachers]);
+
+  const collegeYears = useMemo(() => [...new Set(combinedClasses.map(c => c.year))].filter(Boolean).sort(), [combinedClasses]);
+  const collegeBranches = useMemo(() => [...new Set(combinedClasses.filter(c => c.year === year).map(c => c.branch))].filter(Boolean).sort(), [combinedClasses, year]);
+  const collegeSemesters = useMemo(() => [...new Set(combinedClasses.filter(c => c.year === year && c.branch === branch).map(c => c.semester))].filter(Boolean).sort(), [combinedClasses, year, branch]);
 
   // Filter based on teacher's assigned classes
   const teacherClasses = currentUser?.role === 'teacher' ? currentUser.assignedClasses || [] : [];
-  const allowedYears = currentUser?.role === 'teacher' ? [...new Set(teacherClasses.map(c => c.year))] : YEARS;
-  const allowedBranches = currentUser?.role === 'teacher' ? [...new Set(teacherClasses.filter(c => c.year === year).map(c => c.branch))] : BRANCHES;
-  const allowedSemesters = currentUser?.role === 'teacher' ? [...new Set(teacherClasses.filter(c => c.year === year && c.branch === branch).map(c => c.semester))] : availableSemesters;
+  
+  const allowedYears = currentUser?.role === 'teacher' 
+    ? [...new Set(teacherClasses.map(c => c.year))].filter(Boolean).sort()
+    : collegeYears;
+    
+  const allowedBranches = currentUser?.role === 'teacher' 
+    ? [...new Set(teacherClasses.filter(c => c.year === year).map(c => c.branch))].filter(Boolean).sort()
+    : collegeBranches;
+    
+  const allowedSemesters = currentUser?.role === 'teacher' 
+    ? [...new Set(teacherClasses.filter(c => c.year === year && c.branch === branch).map(c => c.semester))].filter(Boolean).sort()
+    : collegeSemesters;
 
   const fullSubject = useMemo(() => {
     if (!year || !branch || !semester) return '';
@@ -48,7 +69,6 @@ export default function QRAttendance() {
 
   const handleGenerateQR = useCallback(async () => {
     if (!fullSubject) { toast.error('Please select Year, Branch, and Semester first'); return; }
-    const db = await import('../services/db');
     const sessionId = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 mins
     const session = {
@@ -61,7 +81,7 @@ export default function QRAttendance() {
       expiresAt,
       createdBy: settings.facultyName
     };
-    db.qrSessionsDB.add(session);
+    qrSessionsDB.add(session);
     setQrSessionId(sessionId);
     toast.success('QR Code generated. It will expire in 5 minutes.');
   }, [fullSubject, branch, semester, lectureNumber, date, settings.facultyName, toast]);

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiUser, FiLock, FiZap, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiUser, FiLock, FiZap, FiEye, FiEyeOff, FiShield } from 'react-icons/fi';
 import { useAuth } from '../hooks/useAuth';
 import { useStore } from '../store/useStore';
 import { useToast } from '../hooks/useToast';
+import { usersDB } from '../services/db';
 
 export default function Login() {
   const { isAuthenticated, login } = useAuth();
@@ -22,6 +23,13 @@ export default function Login() {
     e.preventDefault();
     if (!username || !password) {
       toast.warning('Please enter username and password');
+      return;
+    }
+    const user = usersDB.getByUsername(username.trim());
+    if (user && user.role === 'superadmin') {
+      toast.error('Super Admin must login through the owner portal.');
+      setShake(true);
+      setTimeout(() => setShake(false), 600);
       return;
     }
     const ok = login(username, password);
@@ -56,14 +64,22 @@ export default function Login() {
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-8"
         >
-          <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl shadow-indigo-900/50">
-            <FiZap className="w-10 h-10 text-white" />
+          <div className="flex flex-col items-center mb-8">
+            {settings.logoUrl ? (
+              <img src={settings.logoUrl} alt="Logo" className="w-16 h-16 rounded-2xl mb-4 shadow-sm object-cover" />
+            ) : (
+              <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/50 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+                <FiShield className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+              </div>
+            )}
+            <h1 className="text-2xl font-bold text-white text-center">
+              {settings.instituteName || 'Attendance System'}
+            </h1>
+            <p className="text-indigo-300 text-sm mt-1">
+              {settings.shortName ? `${settings.shortName} v2.0` : 'Management System v2.0'}
+            </p>
           </div>
-          <h1 className="text-2xl font-black text-white mb-1">{settings.instituteName}</h1>
-          <p className="text-indigo-300 text-sm">{settings.department}</p>
-          <p className="text-indigo-400 text-xs mt-1">{settings.semester}</p>
         </motion.div>
 
         {/* Card */}

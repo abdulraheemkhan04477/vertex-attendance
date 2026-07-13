@@ -23,6 +23,8 @@ const KEYS = {
   QR_SESSIONS: 'vertex_qr_sessions',
   USERS: 'vertex_users',
   COLLEGES: 'vertex_colleges',
+  LEAVES: 'vertex_leaves',
+  SESSIONS: 'vertex_sessions',
 } as const;
 
 // ─── Active College Helper ───────────────────────────────────────────────────
@@ -37,6 +39,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   facultyName: 'Faculty Name',
   theme: 'light',
   supportEmail: 'zuneydkhan04477@gmail.com',
+  whatsappNumber: '+1 234 567 8900',
+  language: 'English',
+  dateFormat: 'MM/DD/YYYY',
+  timeFormat: '12h',
+  autoLogoutTimer: 30, // 30 minutes
+  dashboardDefaultPage: 'Dashboard',
 };
 
 // ─── Local helpers ─────────────────────────────────────────────────────────────
@@ -100,7 +108,7 @@ function rowToStudent(row: Record<string, unknown>): Student {
 function studentToRow(s: Partial<Student> & { id?: string; rollNumber?: string }) {
   return {
     ...(s.id !== undefined && { id: s.id }),
-    ...(s.collegeId !== undefined && { college_id: s.collegeId }),
+    // Removed college_id to fix schema mismatch with Supabase
     ...(s.rollNumber !== undefined && { roll_number: s.rollNumber }),
     ...(s.name !== undefined && { name: s.name }),
     ...(s.department !== undefined && { department: s.department }),
@@ -147,7 +155,7 @@ function rowToAttendance(row: Record<string, unknown>): AttendanceRecord {
 function attendanceToRow(r: Partial<AttendanceRecord> & { id?: string }) {
   return {
     ...(r.id !== undefined && { id: r.id }),
-    ...(r.collegeId !== undefined && { college_id: r.collegeId }),
+    // Removed college_id to fix schema mismatch with Supabase
     ...(r.studentId !== undefined && { student_id: r.studentId }),
     ...(r.rollNumber !== undefined && { roll_number: r.rollNumber }),
     ...(r.studentName !== undefined && { student_name: r.studentName }),
@@ -165,50 +173,101 @@ function attendanceToRow(r: Partial<AttendanceRecord> & { id?: string }) {
 }
 
 // ─── Cloud sync bootstrap ────────────────────────────────────────────────────
-/**
- * Called once on app start. Pulls all data from Supabase into localStorage
- * so the sync API can operate on up-to-date data.
- */
 export async function syncFromCloud(): Promise<void> {
   if (!isSupabaseConfigured || !supabase) return;
   try {
-    // 1. One-time migration: Legacy remote data should be treated as 'default-college' upon read.
-    // (Removed remote UPDATE calls that were causing 400 errors for tables missing college_id)
-
-    // Pull students
-    const { data: studentRows, error: se } = await supabase
-      .from('students')
-      .select('*');
+    let baseStudents: Student[] = [];
+    const { data: studentRows, error: se } = await supabase.from('students').select('*');
     if (!se && studentRows && studentRows.length > 0) {
-      const students = studentRows.map(rowToStudent);
-      setItem<Student>(KEYS.STUDENTS, students);
+      baseStudents = studentRows.map(rowToStudent);
     }
 
-    // Pull attendance
-    const { data: attRows, error: ae } = await supabase
-      .from('attendance_records')
-      .select('*');
+    let baseAttendance: AttendanceRecord[] = [];
+    const { data: attRows, error: ae } = await supabase.from('attendance_records').select('*');
     if (!ae && attRows) {
-      const records = attRows.map(rowToAttendance);
-      setItem<AttendanceRecord>(KEYS.ATTENDANCE, records);
+      baseAttendance = attRows.map(rowToAttendance);
     }
 
-    // Pull settings
-    const { data: settingsRows, error: ste } = await supabase
-      .from('app_settings')
-      .select('*')
-      .eq('key', 'settings')
-      .maybeSingle();
+    const { data: settingsRows, error: ste } = await supabase.from('app_settings').select('*');
     if (!ste && settingsRows) {
-      setObject<AppSettings>(KEYS.SETTINGS, settingsRows.value as AppSettings);
+      const getObj = (key: string) => settingsRows.find(r => r.key === key)?.value;
+
+      const settingsObj = getObj('settings');
+      if (settingsObj) setObject<AppSettings>(KEYS.SETTINGS, settingsObj as AppSettings);
+
+      const leavesObj = getObj('leaves');
+      if (leavesObj) setItem(KEYS.LEAVES || 'vertex_leaves', leavesObj as any[]);
+
+      const sessionsObj = getObj('sessions');
+      if (sessionsObj) setItem(KEYS.SESSIONS || 'vertex_sessions', sessionsObj as any[]);
+
+      const collegesObj = getObj('colleges');
+      if (collegesObj) setItem(KEYS.COLLEGES, collegesObj as any[]);
+
+      const usersObj = getObj('users');
+      if (usersObj) setItem(KEYS.USERS, usersObj as any[]);
+
+      const localStudents = getItem<Student>(KEYS.STUDENTS) || [];
+      const localAtt = getItem<AttendanceRecord>(KEYS.ATTENDANCE) || [];
+
+      const studentsObj = getObj('students') as Student[] | undefined;
+      if (studentsObj) {
+        const studentMap = new Map();
+        baseStudents.forEach(s => {
+          const loc = localStudents.find(ls => ls.id === s.id);
+          if (loc && loc.collegeId) s.collegeId = loc.collegeId;
+          studentMap.set(s.id, s);
+        });
+        studentsObj.forEach(s => studentMap.set(s.id, s));
+        setItem(KEYS.STUDENTS, Array.from(studentMap.values()));
+      } else if (baseStudents.length > 0) {
+        baseStudents.forEach(s => {
+          const loc = localStudents.find(ls => ls.id === s.id);
+          if (loc && loc.collegeId) s.collegeId = loc.collegeId;
+        });
+        setItem(KEYS.STUDENTS, baseStudents);
+      }
+
+      const attendanceObj = getObj('attendance') as AttendanceRecord[] | undefined;
+      if (attendanceObj) {
+        const attMap = new Map();
+        baseAttendance.forEach(a => {
+          const loc = localAtt.find(la => la.id === a.id);
+          if (loc && loc.collegeId) a.collegeId = loc.collegeId;
+          attMap.set(a.id, a);
+        });
+        attendanceObj.forEach(a => attMap.set(a.id, a));
+        setItem(KEYS.ATTENDANCE, Array.from(attMap.values()));
+      } else if (baseAttendance.length > 0) {
+        baseAttendance.forEach(a => {
+          const loc = localAtt.find(la => la.id === a.id);
+          if (loc && loc.collegeId) a.collegeId = loc.collegeId;
+        });
+        setItem(KEYS.ATTENDANCE, baseAttendance);
+      }
+    } else if (baseStudents.length > 0 || baseAttendance.length > 0) {
+      // Fallback if settings fails but base succeeded
+      const localStudents = getItem<Student>(KEYS.STUDENTS) || [];
+      const localAtt = getItem<AttendanceRecord>(KEYS.ATTENDANCE) || [];
+      
+      if (baseStudents.length > 0) {
+        baseStudents.forEach(s => {
+          const loc = localStudents.find(ls => ls.id === s.id);
+          if (loc && loc.collegeId) s.collegeId = loc.collegeId;
+        });
+        setItem(KEYS.STUDENTS, baseStudents);
+      }
+      if (baseAttendance.length > 0) {
+        baseAttendance.forEach(a => {
+          const loc = localAtt.find(la => la.id === a.id);
+          if (loc && loc.collegeId) a.collegeId = loc.collegeId;
+        });
+        setItem(KEYS.ATTENDANCE, baseAttendance);
+      }
     }
 
     // Pull admin auth
-    const { data: authRows, error: authe } = await supabase
-      .from('app_settings')
-      .select('*')
-      .eq('key', 'admin_auth')
-      .maybeSingle();
+    const { data: authRows, error: authe } = await supabase.from('app_settings').select('*').eq('key', 'admin_auth').maybeSingle();
     if (!authe && authRows && authRows.value) {
       const authVal = authRows.value as { password?: string; lastChanged?: string };
       if (authVal.password) localStorage.setItem('vertex_admin_pwd', authVal.password);
@@ -216,9 +275,7 @@ export async function syncFromCloud(): Promise<void> {
     }
 
     // Pull QR sessions
-    const { data: qrRows, error: qrErr } = await supabase
-      .from('qr_sessions')
-      .select('*');
+    const { data: qrRows, error: qrErr } = await supabase.from('qr_sessions').select('*');
     if (!qrErr && qrRows) {
       const formatted = qrRows.map(r => ({
         id: r.id,
@@ -234,35 +291,7 @@ export async function syncFromCloud(): Promise<void> {
       setItem(KEYS.QR_SESSIONS, formatted);
     }
 
-    // Pull colleges
-    const { data: collegesRows, error: ce } = await supabase.from('colleges').select('*');
-    if (!ce && collegesRows && collegesRows.length > 0) {
-      setItem<College>(KEYS.COLLEGES, collegesRows.map(r => ({
-        id: r.id,
-        name: r.name,
-        code: r.code,
-        logoUrl: r.logo_url || r.logoUrl,
-        createdAt: r.created_at || r.createdAt,
-      })));
-    }
-
-    // Pull users
-    const { data: usersRows, error: ue } = await supabase.from('users').select('*');
-    if (!ue && usersRows && usersRows.length > 0) {
-      setItem<User>(KEYS.USERS, usersRows.map(r => ({
-        id: r.id,
-        collegeId: r.college_id || r.collegeId,
-        username: r.username,
-        password: r.password,
-        role: r.role,
-        name: r.name,
-        isActive: r.is_active !== undefined ? r.is_active : r.isActive,
-        createdAt: r.created_at || r.createdAt,
-      })));
-    }
-
     localStorage.setItem(KEYS.CLOUD_SYNCED, 'true');
-    console.log('[DB] Synced from Supabase cloud.');
   } catch (err) {
     console.warn('[DB] Cloud sync failed, using localStorage:', err);
   }
@@ -308,7 +337,6 @@ export function seedDatabase(): void {
     setItem<User>(KEYS.USERS, initialUsers);
     
     localStorage.setItem(KEYS.SEEDED, 'true');
-    console.log('[DB] Database seeded with 61 students and 3 staff users.');
   } else {
     // Migration: ensure superadmin and college_admin exist
     let users = getItem<User>(KEYS.USERS);
@@ -443,13 +471,7 @@ export const collegesDB = {
     all.push(newCollege);
     setItem<College>(KEYS.COLLEGES, all);
     if (isSupabaseConfigured && supabase) {
-      supabase.from('colleges').insert({
-        id: newCollege.id,
-        name: newCollege.name,
-        code: newCollege.code,
-        logo_url: newCollege.logoUrl,
-        created_at: newCollege.createdAt
-      }).then(({ error }) => {
+      supabase.from('app_settings').upsert({ key: 'colleges', value: all }).then(({ error }) => {
         if (error) console.warn('[DB] Supabase insert college error:', error.message);
       });
     }
@@ -463,11 +485,7 @@ export const collegesDB = {
       all[idx] = { ...all[idx], ...updates };
       setItem<College>(KEYS.COLLEGES, all);
       if (isSupabaseConfigured && supabase) {
-        supabase.from('colleges').update({
-          name: updates.name,
-          code: updates.code,
-          logo_url: updates.logoUrl
-        }).eq('id', id).then(({ error }) => {
+        supabase.from('app_settings').upsert({ key: 'colleges', value: all }).then(({ error }) => {
           if (error) console.warn('[DB] Supabase update college error:', error.message);
         });
       }
@@ -479,7 +497,7 @@ export const collegesDB = {
     const filtered = all.filter((c) => c.id !== id);
     setItem<College>(KEYS.COLLEGES, filtered);
     if (isSupabaseConfigured && supabase) {
-      supabase.from('colleges').delete().eq('id', id).then(({ error }) => {
+      supabase.from('app_settings').upsert({ key: 'colleges', value: filtered }).then(({ error }) => {
         if (error) console.warn('[DB] Supabase delete college error:', error.message);
       });
     }
@@ -516,8 +534,7 @@ export const usersDB = {
     all.push(newUser);
     setItem<User>(KEYS.USERS, all);
     if (isSupabaseConfigured && supabase) {
-      // Best effort supabase sync, might fail if table doesn't exist
-      supabase.from('users').insert(newUser).then(({ error }) => {
+      supabase.from('app_settings').upsert({ key: 'users', value: all }).then(({ error }) => {
         if (error) console.warn('[DB] Supabase insert user error:', error.message);
       });
     }
@@ -535,7 +552,7 @@ export const usersDB = {
       all[idx] = { ...all[idx], ...updates };
       setItem<User>(KEYS.USERS, all);
       if (isSupabaseConfigured && supabase) {
-        supabase.from('users').update(updates).eq('id', id).then(({ error }) => {
+        supabase.from('app_settings').upsert({ key: 'users', value: all }).then(({ error }) => {
           if (error) console.warn('[DB] Supabase update user error:', error.message);
         });
       }
@@ -551,7 +568,7 @@ export const usersDB = {
     const filtered = all.filter((u) => u.id !== id);
     setItem<User>(KEYS.USERS, filtered);
     if (isSupabaseConfigured && supabase) {
-      supabase.from('users').delete().eq('id', id).then(({ error }) => {
+      supabase.from('app_settings').upsert({ key: 'users', value: filtered }).then(({ error }) => {
         if (error) console.warn('[DB] Supabase delete user error:', error.message);
       });
     }
@@ -592,6 +609,9 @@ export const studentsDB = {
       supabase.from('students').insert(studentToRow(newStudent)).then(({ error }) => {
         if (error) console.warn('[DB] Supabase insert student error:', error.message);
       });
+      supabase.from('app_settings').upsert({ key: 'students', value: all }).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase app_settings sync student error:', error.message);
+      });
     }
     return newStudent;
   },
@@ -607,6 +627,9 @@ export const studentsDB = {
         supabase.from('students').update(studentToRow(updates)).eq('id', id).then(({ error }) => {
           if (error) console.warn('[DB] Supabase update student error:', error.message);
         });
+        supabase.from('app_settings').upsert({ key: 'students', value: all }).then(({ error }) => {
+          if (error) console.warn('[DB] Supabase app_settings sync student error:', error.message);
+        });
       }
     }
   },
@@ -619,6 +642,9 @@ export const studentsDB = {
     if (isSupabaseConfigured && supabase) {
       supabase.from('students').delete().eq('id', id).then(({ error }) => {
         if (error) console.warn('[DB] Supabase delete student error:', error.message);
+      });
+      supabase.from('app_settings').upsert({ key: 'students', value: filtered }).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase app_settings sync student error:', error.message);
       });
     }
   },
@@ -700,6 +726,9 @@ export const attendanceDB = {
       supabase.from('attendance_records').upsert(upserted.map(attendanceToRow), { onConflict: 'id' }).then(({ error }) => {
         if (error) console.warn('[DB] Supabase upsert attendance error:', error.message);
       });
+      supabase.from('app_settings').upsert({ key: 'attendance', value: all }).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase app_settings sync attendance error:', error.message);
+      });
     }
   },
 
@@ -733,6 +762,9 @@ export const attendanceDB = {
         supabase.from('attendance_records').update(attendanceToRow(changes)).eq('id', id).then(({ error }) => {
           if (error) console.warn('[DB] Supabase update attendance error:', error.message);
         });
+        supabase.from('app_settings').upsert({ key: 'attendance', value: all }).then(({ error }) => {
+          if (error) console.warn('[DB] Supabase app_settings sync attendance error:', error.message);
+        });
       }
     }
   },
@@ -745,6 +777,9 @@ export const attendanceDB = {
     if (isSupabaseConfigured && supabase) {
       supabase.from('attendance_records').delete().eq('id', id).then(({ error }) => {
         if (error) console.warn('[DB] Supabase delete attendance error:', error.message);
+      });
+      supabase.from('app_settings').upsert({ key: 'attendance', value: filtered }).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase app_settings sync attendance error:', error.message);
       });
     }
   },
@@ -770,6 +805,95 @@ export const settingsDB = {
     const current = this.get();
     this.save({ ...current, ...partial });
   },
+};
+
+// ─── Leaves ───────────────────────────────────────────────────────────────────
+export const leavesDB = {
+  getAll(): import('../types').LeaveRequest[] {
+    return getItem<import('../types').LeaveRequest>('vertex_leaves');
+  },
+
+  getByStudent(rollNumber: string): import('../types').LeaveRequest[] {
+    return this.getAll().filter((l) => l.rollNumber === rollNumber);
+  },
+
+  add(leave: Omit<import('../types').LeaveRequest, 'id' | 'status' | 'appliedAt'>): import('../types').LeaveRequest {
+    const all = this.getAll();
+    const newLeave: import('../types').LeaveRequest = {
+      ...leave,
+      id: generateId(),
+      status: 'pending',
+      appliedAt: new Date().toISOString(),
+    };
+    all.push(newLeave);
+    setItem('vertex_leaves', all);
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('app_settings').upsert({ key: 'leaves', value: all }).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase save leaves error:', error.message);
+      });
+    }
+    return newLeave;
+  },
+
+  update(id: string, updates: Partial<import('../types').LeaveRequest>): void {
+    const all = this.getAll();
+    const idx = all.findIndex((l) => l.id === id);
+    if (idx >= 0) {
+      all[idx] = { ...all[idx], ...updates };
+      setItem('vertex_leaves', all);
+      if (isSupabaseConfigured && supabase) {
+        supabase.from('app_settings').upsert({ key: 'leaves', value: all }).then(({ error }) => {
+          if (error) console.warn('[DB] Supabase update leaves error:', error.message);
+        });
+      }
+    }
+  },
+};
+
+// ─── Sessions ─────────────────────────────────────────────────────────────────
+export const sessionsDB = {
+  getAll(): import('../types').Session[] {
+    return getItem<import('../types').Session>('vertex_sessions');
+  },
+
+  add(session: import('../types').Session): void {
+    const all = this.getAll();
+    all.push(session);
+    setItem('vertex_sessions', all);
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('app_settings').upsert({ key: 'sessions', value: all });
+    }
+  },
+
+  updateLastActive(id: string): void {
+    const all = this.getAll();
+    const idx = all.findIndex((s) => s.id === id);
+    if (idx >= 0) {
+      all[idx].lastActive = new Date().toISOString();
+      setItem('vertex_sessions', all);
+      if (isSupabaseConfigured && supabase) {
+        supabase.from('app_settings').upsert({ key: 'sessions', value: all });
+      }
+    }
+  },
+
+  clearAllButCurrent(currentId: string): void {
+    const all = this.getAll();
+    const filtered = all.filter(s => s.id === currentId);
+    setItem('vertex_sessions', filtered);
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('app_settings').upsert({ key: 'sessions', value: filtered });
+    }
+  },
+
+  delete(id: string): void {
+    const all = this.getAll();
+    const filtered = all.filter(s => s.id !== id);
+    setItem('vertex_sessions', filtered);
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('app_settings').upsert({ key: 'sessions', value: filtered });
+    }
+  }
 };
 
 
@@ -820,7 +944,6 @@ export const qrSessionsDB = {
       console.warn('[DB] Supabase not configured. Cannot fetch session from cloud.');
       return null;
     }
-    console.log(`[DB] Fetching session ${id} from cloud...`);
     const { data, error } = await supabase.from('qr_sessions').select('*').eq('id', id).maybeSingle();
     if (error) {
       console.error('[DB] Supabase fetch error in fetchSessionFromCloud:', error.message);
