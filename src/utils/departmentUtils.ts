@@ -3,33 +3,75 @@ export function normalizeDepartment(dept: string | undefined): string {
   
   const normalized = dept.toLowerCase().replace(/[^a-z0-9]/g, '');
   
-  // Standardize common department abbreviations and full names
-  if (normalized.includes('ec') || normalized.includes('electronics') || normalized.includes('communication')) {
-    return 'ece';
+  // Exact matches based on normalized alphanumeric strings to prevent overlap
+  switch (normalized) {
+    case 'ece':
+    case 'ec':
+    case 'ecece':
+    case 'electronics':
+    case 'electronicsandcommunication':
+    case 'electronicscommunication':
+    case 'electronicsandcommunicationengineering':
+    case 'electronicscommunicationengineering':
+      return 'ece';
+      
+    case 'cse':
+    case 'cs':
+    case 'cscse':
+    case 'computer':
+    case 'computerscience':
+    case 'computerscienceengineering':
+    case 'computerscienceandengineering':
+      return 'cse';
+      
+    case 'csd':
+    case 'computersciencedesign':
+    case 'computerscienceanddesign':
+    case 'computersciencedesignengineering':
+      return 'csd';
+      
+    case 'mech':
+    case 'me':
+    case 'memech':
+    case 'mechanical':
+    case 'mechanicalengineering':
+      return 'mech';
+      
+    case 'civil':
+    case 'ce':
+    case 'cecivil':
+    case 'civilengineering':
+      return 'civil';
+      
+    case 'ee':
+    case 'eee':
+    case 'eeeee':
+    case 'electrical':
+    case 'electricalengineering':
+    case 'electricalandelectronics':
+    case 'electricalelectronicsengineering':
+    case 'electricalandelectronicsengineering':
+      return 'ee';
+      
+    case 'it':
+    case 'informationtechnology':
+      return 'it';
+      
+    case 'biotech':
+    case 'bio':
+    case 'biotechnology':
+      return 'biotech';
+      
+    case 'aiml':
+    case 'ai':
+    case 'artificialintelligence':
+    case 'artificialintelligencemachinelearning':
+    case 'aimachinelearning':
+      return 'aiml';
+      
+    default:
+      return normalized;
   }
-  if (normalized.includes('cs') || normalized.includes('computer')) {
-    return 'cse';
-  }
-  if (normalized.includes('me') || normalized.includes('mechanical')) {
-    return 'mech';
-  }
-  if (normalized.includes('ce') || normalized.includes('civil')) {
-    return 'civil';
-  }
-  if (normalized.includes('ee') || normalized.includes('electrical')) {
-    return 'eee';
-  }
-  if (normalized.includes('it') || normalized.includes('information')) {
-    return 'it';
-  }
-  if (normalized.includes('bio')) {
-    return 'biotech';
-  }
-  if (normalized.includes('ai') || normalized.includes('artificial')) {
-    return 'aiml';
-  }
-  
-  return normalized;
 }
 
 export function isSameDepartment(dept1: string | undefined, dept2: string | undefined, branch2?: string | undefined): boolean {

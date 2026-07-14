@@ -73,18 +73,21 @@ export default function QRAttendance() {
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 mins
     const session = {
       id: sessionId,
+      teacherId: currentUser?.id || '',
       year,
       branch,
       semester,
+      subject: fullSubject,
       lectureNumber,
       date,
+      timestamp: new Date().toISOString(),
       expiresAt,
       createdBy: settings.facultyName
     };
     qrSessionsDB.add(session);
-    setQrSessionId(sessionId);
+    setQrSessionId(JSON.stringify(session));
     toast.success('QR Code generated. It will expire in 5 minutes.');
-  }, [fullSubject, branch, semester, lectureNumber, date, settings.facultyName, toast]);
+  }, [fullSubject, branch, semester, lectureNumber, date, settings.facultyName, toast, year, currentUser]);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">

@@ -1,0 +1,443 @@
+﻿
+> vertex@0.0.0 lint
+> oxlint
+
+
+  ! eslint(no-unused-vars): Identifier 'useStore' is imported but never used.
+   ,-[src/pages/OwnerLogin.tsx:6:10]
+ 5 | import { useAuth } from '../hooks/useAuth';
+ 6 | import { useStore } from '../store/useStore';
+   :          ^^^^|^^^
+   :              `-- 'useStore' is imported here
+ 7 | import { useToast } from '../hooks/useToast';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'setLoading' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/OwnerLogin.tsx:19:19]
+ 18 |   const [showPass, setShowPass] = useState(false);
+ 19 |   const [loading, setLoading] = useState(false);
+    :                   ^^^^^|^^^^
+    :                        `-- 'setLoading' is declared here
+ 20 |   const [shake, setShake] = useState(false);
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Identifier 'Badge' is imported but never used.
+   ,-[src/pages/Dashboard.tsx:5:10]
+ 4 | import { StatCard } from '../components/ui/StatCard';
+ 5 | import { Badge } from '../components/ui/Badge';
+   :          ^^|^^
+   :            `-- 'Badge' is imported here
+ 6 | import { ProgressBar } from '../components/ui/ProgressBar';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'formatDateTime' is imported but never used.
+    ,-[src/pages/Dashboard.tsx:10:22]
+  9 | import { studentsDB } from '../services/db';
+ 10 | import { formatDate, formatDateTime, today } from '../utils/dateUtils';
+    :                      ^^^^^^^|^^^^^^
+    :                             `-- 'formatDateTime' is imported here
+ 11 | import { useStore } from '../store/useStore';
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'overallStats' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/Dashboard.tsx:26:9]
+ 25 |   const todayStats = useMemo(() => attendanceService.getTodayStats(todayStr), [todayStr]);
+ 26 |   const overallStats = useMemo(() => attendanceService.getOverallStats(), []);
+    :         ^^^^^^|^^^^^
+    :               `-- 'overallStats' is declared here
+ 27 |   const recentSessions = useMemo(() => attendanceService.getRecentSessions(8), []);
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Type 'Student' is imported but never used.
+   ,-[src/pages/student-portal/LeaveApply.tsx:7:29]
+ 6 | import { leavesDB } from '../../services/db';
+ 7 | import type { LeaveRequest, Student } from '../../types';
+   :                             ^^^|^^^
+   :                                `-- 'Student' is imported here
+ 8 | import { studentAuthService } from '../../services/auth';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'motion' is imported but never used.
+   ,-[src/pages/Analytics.tsx:2:10]
+ 1 | import { useMemo, useState } from 'react';
+ 2 | import { motion } from 'framer-motion';
+   :          ^^^|^^
+   :             `-- 'motion' is imported here
+ 3 | import {
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'LineChart' is imported but never used.
+   ,-[src/pages/Analytics.tsx:5:32]
+ 4 |   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+ 5 |   Legend, ResponsiveContainer, LineChart, Line
+   :                                ^^^^|^^^^
+   :                                    `-- 'LineChart' is imported here
+ 6 | } from 'recharts';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'Line' is imported but never used.
+   ,-[src/pages/Analytics.tsx:5:43]
+ 4 |   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+ 5 |   Legend, ResponsiveContainer, LineChart, Line
+   :                                           ^^|^
+   :                                             `-- 'Line' is imported here
+ 6 | } from 'recharts';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'Badge' is imported but never used.
+    ,-[src/pages/Analytics.tsx:9:10]
+  8 | import { StatCard } from '../components/ui/StatCard';
+  9 | import { Badge } from '../components/ui/Badge';
+    :          ^^|^^
+    :            `-- 'Badge' is imported here
+ 10 | import { ProgressBar } from '../components/ui/ProgressBar';
+    `----
+  help: Consider removing this import.
+
+  ! react-hooks(exhaustive-deps): React Hook useMemo has unnecessary dependency: refreshTrigger
+    ,-[src/pages/Students.tsx:37:6]
+ 36 |     return list.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true }));
+ 37 |   }, [refreshTrigger, currentUser]);
+    :      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 38 |   const allStats = useMemo(() => attendanceService.getAllStudentStats(), [refreshTrigger]);
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useMemo has unnecessary dependency: refreshTrigger
+    ,-[src/pages/Students.tsx:38:74]
+ 37 |   }, [refreshTrigger, currentUser]);
+ 38 |   const allStats = useMemo(() => attendanceService.getAllStudentStats(), [refreshTrigger]);
+    :                                                                          ^^^^^^^^^^^^^^^^
+ 39 |   
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'scanned'
+    ,-[src/components/student/QRScannerModal.tsx:55:17]
+ 54 |           async (decodedText) => {
+ 55 |             if (scanned) return;
+    :                 ^^^|^^^
+    :                    `-- useEffect uses `scanned` here
+ 56 |             setScanned(true);
+    `----
+     ,-[src/components/student/QRScannerModal.tsx:164:6]
+ 163 |     };
+ 164 |   }, [isOpen, toast, student, onClose]);
+     :      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 165 | 
+     `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'useCallback' is imported but never used.
+   ,-[src/pages/Staff.tsx:1:29]
+ 1 | import { useState, useMemo, useCallback } from 'react';
+   :                             ^^^^^|^^^^^
+   :                                  `-- 'useCallback' is imported here
+ 2 | import { motion } from 'framer-motion';
+   `----
+  help: Consider removing this import.
+
+  ! react-hooks(exhaustive-deps): React Hook useMemo has unnecessary dependency: refreshTrigger
+    ,-[src/pages/Staff.tsx:39:6]
+ 38 |     return list;
+ 39 |   }, [refreshTrigger, currentUser]);
+    :      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 40 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'FiZap' is imported but never used.
+   ,-[src/pages/StudentPortal.tsx:3:20]
+ 2 | import { useEffect, useState } from 'react';
+ 3 | import { FiLogOut, FiZap, FiSun, FiMoon, FiShield } from 'react-icons/fi';
+   :                    ^^|^^
+   :                      `-- 'FiZap' is imported here
+ 4 | import { NavLink } from 'react-router-dom';
+   `----
+  help: Consider removing this import.
+
+  ! react-hooks(exhaustive-deps): React Hook useCallback has a missing dependency: 'year'
+    ,-[src/pages/QRAttendance.tsx:87:6]
+ 75 |       id: sessionId,
+ 76 |       year,
+    :       ^^|^
+    :         `-- useCallback uses `year` here
+ 77 |       branch,
+ 78 |       semester,
+ 79 |       lectureNumber,
+ 80 |       date,
+ 81 |       expiresAt,
+ 82 |       createdBy: settings.facultyName
+ 83 |     };
+ 84 |     qrSessionsDB.add(session);
+ 85 |     setQrSessionId(sessionId);
+ 86 |     toast.success('QR Code generated. It will expire in 5 minutes.');
+ 87 |   }, [fullSubject, branch, semester, lectureNumber, date, settings.facultyName, toast]);
+    :      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 88 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'FiZap' is imported but never used.
+   ,-[src/pages/Login.tsx:4:26]
+ 3 | import { motion } from 'framer-motion';
+ 4 | import { FiUser, FiLock, FiZap, FiEye, FiEyeOff, FiShield } from 'react-icons/fi';
+   :                          ^^|^^
+   :                            `-- 'FiZap' is imported here
+ 5 | import { useAuth } from '../hooks/useAuth';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'setLoading' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/Login.tsx:17:19]
+ 16 |   const [showPass, setShowPass] = useState(false);
+ 17 |   const [loading, setLoading] = useState(false);
+    :                   ^^^^^|^^^^
+    :                        `-- 'setLoading' is declared here
+ 18 |   const [shake, setShake] = useState(false);
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'setLoading' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/StudentLogin.tsx:16:19]
+ 15 |   const [showPass, setShowPass] = useState(false);
+ 16 |   const [loading, setLoading] = useState(false);
+    :                   ^^^^^|^^^^
+    :                        `-- 'setLoading' is declared here
+ 17 |   const [shake, setShake] = useState(false);
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Identifier 'FiDownload' is imported but never used.
+   ,-[src/pages/Reports.tsx:3:10]
+ 2 | import { motion } from 'framer-motion';
+ 3 | import { FiDownload, FiFileText, FiCalendar, FiPrinter, FiFilter } from 'react-icons/fi';
+   :          ^^^^^|^^^^
+   :               `-- 'FiDownload' is imported here
+ 4 | import { Button } from '../components/ui/Button';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'FiFileText' is imported but never used.
+   ,-[src/pages/Reports.tsx:3:22]
+ 2 | import { motion } from 'framer-motion';
+ 3 | import { FiDownload, FiFileText, FiCalendar, FiPrinter, FiFilter } from 'react-icons/fi';
+   :                      ^^^^^|^^^^
+   :                           `-- 'FiFileText' is imported here
+ 4 | import { Button } from '../components/ui/Button';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'FiCalendar' is imported but never used.
+   ,-[src/pages/Reports.tsx:3:34]
+ 2 | import { motion } from 'framer-motion';
+ 3 | import { FiDownload, FiFileText, FiCalendar, FiPrinter, FiFilter } from 'react-icons/fi';
+   :                                  ^^^^^|^^^^
+   :                                       `-- 'FiCalendar' is imported here
+ 4 | import { Button } from '../components/ui/Button';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'FiPrinter' is imported but never used.
+   ,-[src/pages/Reports.tsx:3:46]
+ 2 | import { motion } from 'framer-motion';
+ 3 | import { FiDownload, FiFileText, FiCalendar, FiPrinter, FiFilter } from 'react-icons/fi';
+   :                                              ^^^^|^^^^
+   :                                                  `-- 'FiPrinter' is imported here
+ 4 | import { Button } from '../components/ui/Button';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'Button' is imported but never used.
+   ,-[src/pages/Reports.tsx:4:10]
+ 3 | import { FiDownload, FiFileText, FiCalendar, FiPrinter, FiFilter } from 'react-icons/fi';
+ 4 | import { Button } from '../components/ui/Button';
+   :          ^^^|^^
+   :             `-- 'Button' is imported here
+ 5 | import { attendanceService } from '../services/attendanceService';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'motion' is imported but never used.
+   ,-[src/pages/History.tsx:2:10]
+ 1 | import { useState, useMemo } from 'react';
+ 2 | import { motion } from 'framer-motion';
+   :          ^^^|^^
+   :             `-- 'motion' is imported here
+ 3 | import { FiCalendar, FiFilter, FiSearch, FiDownload, FiChevronLeft, FiChevronRight, FiBook } from 'react-icons/fi';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'FiFilter' is imported but never used.
+   ,-[src/pages/History.tsx:3:22]
+ 2 | import { motion } from 'framer-motion';
+ 3 | import { FiCalendar, FiFilter, FiSearch, FiDownload, FiChevronLeft, FiChevronRight, FiBook } from 'react-icons/fi';
+   :                      ^^^^|^^^
+   :                          `-- 'FiFilter' is imported here
+ 4 | import { Badge } from '../components/ui/Badge';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'FiBook' is imported but never used.
+   ,-[src/pages/History.tsx:3:85]
+ 2 | import { motion } from 'framer-motion';
+ 3 | import { FiCalendar, FiFilter, FiSearch, FiDownload, FiChevronLeft, FiChevronRight, FiBook } from 'react-icons/fi';
+   :                                                                                     ^^^|^^
+   :                                                                                        `-- 'FiBook' is imported here
+ 4 | import { Badge } from '../components/ui/Badge';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Type 'AttendanceStatus' is imported but never used.
+    ,-[src/pages/History.tsx:12:33]
+ 11 | import { format } from 'date-fns';
+ 12 | import type { AttendanceRecord, AttendanceStatus } from '../types';
+    :                                 ^^^^^^^^|^^^^^^^
+    :                                         `-- 'AttendanceStatus' is imported here
+ 13 | import { AttendanceEditModal } from '../components/attendance/AttendanceEditModal';
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'allSessions' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/History.tsx:18:9]
+ 17 |   const allStudents = useMemo(() => studentsDB.getAll(), []);
+ 18 |   const allSessions = useMemo(() => attendanceService.getUniqueSessions(), []);
+    :         ^^^^^|^^^^^
+    :              `-- 'allSessions' is declared here
+ 19 | 
+    `----
+  help: Consider removing this declaration.
+
+  ! react-hooks(exhaustive-deps): React Hook useMemo has unnecessary dependency: refreshKey
+    ,-[src/pages/History.tsx:45:6]
+ 44 |     }
+ 45 |   }, [viewMode, selectedDate, selectedRoll, searchQuery, calYear, calMonth, refreshKey]);
+    :      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 46 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useMemo has unnecessary dependency: refreshKey
+    ,-[src/pages/History.tsx:48:84]
+ 47 |   const calDays = useMemo(() => getMonthDays(calYear, calMonth), [calYear, calMonth]);
+ 48 |   const datesWithData = useMemo(() => new Set(attendanceService.getUniqueDates()), [refreshKey]);
+    :                                                                                    ^^^^^^^^^^^^
+ 49 | 
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'ProgressBar' is imported but never used.
+   ,-[src/pages/student-portal/StudentDashboard.tsx:4:10]
+ 3 | import { FiClock, FiCalendar, FiBook, FiCheckCircle, FiXCircle, FiAlertCircle, FiUser, FiCamera } from 'react-icons/fi';
+ 4 | import { ProgressBar } from '../../components/ui/ProgressBar';
+   :          ^^^^^|^^^^^
+   :               `-- 'ProgressBar' is imported here
+ 5 | import { Badge } from '../../components/ui/Badge';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'STATUS_COLORS' is imported but never used.
+    ,-[src/pages/student-portal/StudentDashboard.tsx:9:10]
+  8 | import { formatDate } from '../../utils/dateUtils';
+  9 | import { STATUS_COLORS, STATUS_LABELS } from '../../types';
+    :          ^^^^^^|^^^^^^
+    :                `-- 'STATUS_COLORS' is imported here
+ 10 | import { StudentProfileEditModal } from '../../components/student/StudentProfileEditModal';
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'leave' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/student-portal/StudentDashboard.tsx:59:34]
+ 58 | 
+ 59 |   const { present, absent, late, leave, total, percentage } = stats;
+    :                                  ^^|^^
+    :                                    `-- 'leave' is declared here
+ 60 | 
+    `----
+  help: Consider removing this declaration.
+
+  ! react-hooks(exhaustive-deps): React Hook useMemo has a missing dependency: 'student'
+    ,-[src/pages/student-portal/StudentDashboard.tsx:47:6]
+ 45 |   const history = useMemo(() => {
+ 46 |     return student ? attendanceService.getStudentHistory(student.rollNumber) : [];
+    :            ^^^|^^^
+    :               `-- useMemo uses `student` here
+ 47 |   }, [student?.rollNumber]);
+    :      ^^^^^^^^^^^^^^^^^^^^^
+ 48 |   
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useMemo has a missing dependency: 'student'
+    ,-[src/pages/student-portal/StudentDashboard.tsx:52:6]
+ 49 |   const stats = useMemo(() => {
+ 50 |     const s = student ? attendanceService.getStudentStats(student.rollNumber) : null;
+    :               ^^^|^^^
+    :                  `-- useMemo uses `student` here
+ 51 |     return s || { present: 0, absent: 0, late: 0, leave: 0, total: 0, percentage: 0 };
+ 52 |   }, [student?.rollNumber, history.length]);
+    :      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 53 |   if (!student) return null;
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useMemo has unnecessary dependency: history.length
+    ,-[src/pages/student-portal/StudentDashboard.tsx:52:6]
+ 51 |     return s || { present: 0, absent: 0, late: 0, leave: 0, total: 0, percentage: 0 };
+ 52 |   }, [student?.rollNumber, history.length]);
+    :      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 53 |   if (!student) return null;
+    `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint(no-unused-vars): Identifier 'motion' is imported but never used.
+   ,-[src/pages/Attendance.tsx:2:10]
+ 1 | import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+ 2 | import { motion } from 'framer-motion';
+   :          ^^^|^^
+   :             `-- 'motion' is imported here
+ 3 | import {
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'FiZap' is imported but never used.
+   ,-[src/pages/Attendance.tsx:5:55]
+ 4 |   FiSearch, FiSave, FiRefreshCw, FiCheckCircle, FiXCircle, FiFilter,
+ 5 |   FiDownload, FiUsers, FiChevronLeft, FiChevronRight, FiZap
+   :                                                       ^^|^^
+   :                                                         `-- 'FiZap' is imported here
+ 6 | } from 'react-icons/fi';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'sessionsDB' is imported but never used.
+    ,-[src/pages/Settings.tsx:12:10]
+ 11 | import { useAuth } from '../hooks/useAuth';
+ 12 | import { sessionsDB, authDB } from '../services/db';
+    :          ^^^^^|^^^^
+    :               `-- 'sessionsDB' is imported here
+ 13 | 
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'toggleTheme' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/pages/Settings.tsx:15:44]
+ 14 | export default function Settings() {
+ 15 |   const { settings, updateSettings, theme, toggleTheme, currentUser, setCurrentUser } = useStore();
+    :                                            ^^^^^|^^^^^
+    :                                                 `-- 'toggleTheme' is declared here
+ 16 |   const { logout } = useAuth();
+    `----
+  help: Consider removing this declaration.
+
+Found 42 warnings and 0 errors.
+Finished in 82ms on 52 files with 103 rules using 12 threads.

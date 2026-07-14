@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { FiCalendar, FiFilter, FiSearch, FiDownload, FiChevronLeft, FiChevronRight, FiBook } from 'react-icons/fi';
+import { FiCalendar, FiSearch, FiDownload, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { StudentProfile } from '../components/student/StudentProfile';
@@ -9,13 +8,12 @@ import { studentsDB } from '../services/db';
 import { exportToCSV, exportToExcel, exportToPDF } from '../services/exportService';
 import { formatDate, formatDateLong, getMonthDays, today } from '../utils/dateUtils';
 import { format } from 'date-fns';
-import type { AttendanceRecord, AttendanceStatus } from '../types';
+import type { AttendanceRecord } from '../types';
 import { AttendanceEditModal } from '../components/attendance/AttendanceEditModal';
 import { useToast } from '../hooks/useToast';
 import { attendanceDB } from '../services/db';
 export default function History() {
   const allStudents = useMemo(() => studentsDB.getAll(), []);
-  const allSessions = useMemo(() => attendanceService.getUniqueSessions(), []);
 
   const [viewMode, setViewMode] = useState<'date' | 'student' | 'calendar'>('date');
   const [selectedDate, setSelectedDate] = useState(today());
@@ -42,9 +40,11 @@ export default function History() {
       default:
         return [];
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, selectedDate, selectedRoll, searchQuery, calYear, calMonth, refreshKey]);
 
   const calDays = useMemo(() => getMonthDays(calYear, calMonth), [calYear, calMonth]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const datesWithData = useMemo(() => new Set(attendanceService.getUniqueDates()), [refreshKey]);
 
   const handleExport = (type: 'csv' | 'excel' | 'pdf') => {

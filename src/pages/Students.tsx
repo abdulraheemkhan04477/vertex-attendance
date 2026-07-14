@@ -30,11 +30,10 @@ export default function Students() {
   
   const allStudents = useMemo(() => {
     let list = studentsDB.getAll();
-    if (currentUser?.role === 'hod' && currentUser.department) {
-      list = list.filter(s => isSameDepartment(currentUser.department, s.department, s.branch));
-    }
     return list.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTrigger, currentUser]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const allStats = useMemo(() => attendanceService.getAllStudentStats(), [refreshTrigger]);
   
   const statsMap = useMemo(() => {

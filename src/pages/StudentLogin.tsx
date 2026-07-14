@@ -13,7 +13,7 @@ export default function StudentLogin() {
   const [rollNumber, setRollNumber] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, _setLoading] = useState(false);
   const [shake, setShake] = useState(false);
 
   if (studentAuthService.isAuthenticated()) return <Navigate to="/student/dashboard" replace />;

@@ -1,8 +1,8 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { FiSearch, FiShield, FiPlus, FiEdit2, FiTrash2, FiUserCheck, FiUserX } from 'react-icons/fi';
 import { Button } from '../components/ui/Button';
-import { usersDB, collegesDB } from '../services/db';
+import { usersDB } from '../services/db';
 import { useToast } from '../hooks/useToast';
 import { useStore } from '../store/useStore';
 import type { User, UserRole } from '../types';
@@ -36,6 +36,7 @@ export default function Staff() {
     }
     
     return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTrigger, currentUser]);
 
   const filteredStaff = useMemo(() => {
@@ -173,11 +174,7 @@ export default function Staff() {
                       <span className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full border ${getRoleColor(staff.role)}`}>
                         {getRoleLabel(staff.role)}
                       </span>
-                      {staff.role === 'college_admin' && staff.collegeId && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          {collegesDB.getById(staff.collegeId)?.name || 'Unknown College'}
-                        </div>
-                      )}
+
                     </td>
                     <td className="p-4 text-gray-600 dark:text-gray-300">
                       {staff.department || '-'}

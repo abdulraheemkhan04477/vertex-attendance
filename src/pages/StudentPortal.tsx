@@ -1,6 +1,6 @@
 import { Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { FiLogOut, FiZap, FiSun, FiMoon, FiShield } from 'react-icons/fi';
+import { FiLogOut, FiSun, FiMoon, FiShield } from 'react-icons/fi';
 import { NavLink } from 'react-router-dom';
 import { studentAuthService } from '../services/auth';
 import { useStore } from '../store/useStore';

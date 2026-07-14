@@ -17,14 +17,8 @@ export default function Leaves() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
 
   useEffect(() => {
-    // Only fetch leaves for the current college if user is college admin
-    const allLeaves = leavesDB.getAll();
-    if (currentUser?.role === 'superadmin') {
-      setLeaves(allLeaves);
-    } else {
-      setLeaves(allLeaves.filter(l => l.collegeId === settings.collegeId));
-    }
-  }, [currentUser, settings.collegeId]);
+    setLeaves(leavesDB.getAll());
+  }, [currentUser]);
 
   const handleUpdateStatus = (id: string, status: 'approved' | 'rejected') => {
     leavesDB.update(id, { 

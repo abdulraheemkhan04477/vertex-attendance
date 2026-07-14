@@ -9,10 +9,10 @@ import { authService } from '../services/auth';
 import { usersDB } from '../services/db';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../hooks/useAuth';
-import { sessionsDB } from '../services/db';
+import { authDB } from '../services/db';
 
 export default function Settings() {
-  const { settings, updateSettings, theme, toggleTheme, currentUser, setCurrentUser } = useStore();
+  const { settings, updateSettings, theme, toggleTheme: _toggleTheme, currentUser, setCurrentUser } = useStore();
   const { logout } = useAuth();
   const toast = useToast();
   const [form, setForm] = useState<AppSettings>({ ...settings });
@@ -68,7 +68,6 @@ export default function Settings() {
       
       // Keep cloud synced for admin
       if (currentUser.role === 'superadmin' || currentUser.role === 'college_admin') {
-        const { authDB } = await import('../services/db');
         authDB.syncAdminAuth(passwordForm.new, new Date().toISOString());
       }
       

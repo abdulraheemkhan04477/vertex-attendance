@@ -14,9 +14,7 @@ export const authService = {
       authDB.setToken(user.id);
       useStore.getState().setCurrentUser(user);
       if (user.role === 'superadmin') {
-        useStore.getState().setActiveCollegeId('ALL');
-      } else {
-        useStore.getState().setActiveCollegeId(user.collegeId || 'default-college');
+        // Superadmin login
       }
       return true;
     }
@@ -26,7 +24,6 @@ export const authService = {
   logout(): void {
     authDB.clearToken();
     useStore.getState().setCurrentUser(null);
-    useStore.getState().setActiveCollegeId(null);
   },
 
   isAuthenticated(): boolean {
@@ -46,7 +43,6 @@ export const studentAuthService = {
     const student = studentsDB.getByRollNumber(rollNumber);
     if (student && student.password === password) {
       authDB.setStudentToken(rollNumber);
-      useStore.getState().setActiveCollegeId(student.collegeId || 'default-college');
       return true;
     }
     return false;
@@ -54,7 +50,6 @@ export const studentAuthService = {
 
   logout(): void {
     authDB.clearStudentToken();
-    useStore.getState().setActiveCollegeId(null);
   },
 
   isAuthenticated(): boolean {

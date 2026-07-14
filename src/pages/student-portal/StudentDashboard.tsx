@@ -1,12 +1,11 @@
 import { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FiClock, FiCalendar, FiBook, FiCheckCircle, FiXCircle, FiAlertCircle, FiUser, FiCamera } from 'react-icons/fi';
-import { ProgressBar } from '../../components/ui/ProgressBar';
 import { Badge } from '../../components/ui/Badge';
 import { studentAuthService } from '../../services/auth';
 import { attendanceService } from '../../services/attendanceService';
 import { formatDate } from '../../utils/dateUtils';
-import { STATUS_COLORS, STATUS_LABELS } from '../../types';
+import { STATUS_LABELS } from '../../types';
 import { StudentProfileEditModal } from '../../components/student/StudentProfileEditModal';
 import { QRScannerModal } from '../../components/student/QRScannerModal';
 import { Button } from '../../components/ui/Button';
@@ -44,11 +43,13 @@ export default function StudentDashboard() {
 
   const history = useMemo(() => {
     return student ? attendanceService.getStudentHistory(student.rollNumber) : [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [student?.rollNumber]);
   
   const stats = useMemo(() => {
     const s = student ? attendanceService.getStudentStats(student.rollNumber) : null;
     return s || { present: 0, absent: 0, late: 0, leave: 0, total: 0, percentage: 0 };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [student?.rollNumber, history.length]);
   if (!student) return null;
 
@@ -56,7 +57,7 @@ export default function StudentDashboard() {
     setStudent(studentAuthService.getCurrentStudent());
   };
 
-  const { present, absent, late, leave, total, percentage } = stats;
+  const { present, absent, late, total, percentage } = stats;
 
   // Take recent 30 records
   const recentHistory = [...history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 30);

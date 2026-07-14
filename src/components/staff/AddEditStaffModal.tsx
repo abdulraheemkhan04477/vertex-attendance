@@ -4,7 +4,7 @@ import { FiX, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { Button } from '../ui/Button';
 import { User, UserRole, YEARS, BRANCHES, SEMESTERS_BY_YEAR } from '../../types';
 import { useStore } from '../../store/useStore';
-import { usersDB, collegesDB } from '../../services/db';
+import { usersDB } from '../../services/db';
 
 interface AddEditStaffModalProps {
   isOpen: boolean;
@@ -22,10 +22,6 @@ export function AddEditStaffModal({ isOpen, onClose, staff, onSave }: AddEditSta
   });
   const [password, setPassword] = useState('');
   
-  // College details for College Admin creation
-  const [collegeName, setCollegeName] = useState('');
-  const [collegeCode, setCollegeCode] = useState('');
-  const [collegeLogo, setCollegeLogo] = useState('');
 
   // Setup initial form state based on editing vs creating
   useEffect(() => {
@@ -48,9 +44,6 @@ export function AddEditStaffModal({ isOpen, onClose, staff, onSave }: AddEditSta
         assignedClasses: [],
       });
       setPassword('');
-      setCollegeName('');
-      setCollegeCode('');
-      setCollegeLogo('');
     }
   }, [staff, isOpen, currentUser]);
 
@@ -63,10 +56,6 @@ export function AddEditStaffModal({ isOpen, onClose, staff, onSave }: AddEditSta
       return;
     }
 
-    if (!staff && formData.role === 'college_admin' && (!collegeName || !collegeCode)) {
-      alert('College Name and College Code are required when creating a College Admin');
-      return;
-    }
 
     if (staff) {
       // Editing
@@ -84,17 +73,6 @@ export function AddEditStaffModal({ isOpen, onClose, staff, onSave }: AddEditSta
       usersDB.update(staff.id, updates);
     } else {
       // Creating
-      let newCollegeId = undefined;
-      
-      if (formData.role === 'college_admin') {
-        const newCollege = collegesDB.add({
-          name: collegeName,
-          code: collegeCode,
-          logoUrl: collegeLogo
-        });
-        newCollegeId = newCollege.id;
-      }
-
       usersDB.add({
         username: formData.username,
         password: password,
@@ -102,7 +80,6 @@ export function AddEditStaffModal({ isOpen, onClose, staff, onSave }: AddEditSta
         email: formData.email,
         role: formData.role as UserRole,
         department: formData.department,
-        collegeId: newCollegeId, // Set explicitly
         assignedClasses: formData.role === 'teacher' ? formData.assignedClasses : [],
         isActive: formData.isActive ?? true,
         createdAt: new Date().toISOString(),
@@ -286,52 +263,6 @@ export function AddEditStaffModal({ isOpen, onClose, staff, onSave }: AddEditSta
                 )}
               </div>
 
-              {/* College Details (Only for Super Admin creating College Admin) */}
-              {!staff && formData.role === 'college_admin' && (
-                <div className="mt-6 border-t border-gray-100 dark:border-gray-700 pt-6">
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4">College Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        College Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={collegeName}
-                        onChange={(e) => setCollegeName(e.target.value)}
-                        className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 dark:text-white"
-                        placeholder="e.g. Vertex Institute"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        College Code <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={collegeCode}
-                        onChange={(e) => setCollegeCode(e.target.value)}
-                        className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 dark:text-white"
-                        placeholder="e.g. VIT"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        College Logo URL (Optional)
-                      </label>
-                      <input
-                        type="url"
-                        value={collegeLogo}
-                        onChange={(e) => setCollegeLogo(e.target.value)}
-                        className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 dark:text-white"
-                        placeholder="https://example.com/logo.png"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Assigned Classes (Only for Teachers) */}
               {formData.role === 'teacher' && (

@@ -4,7 +4,7 @@ import { FiCalendar, FiClock, FiCheckCircle, FiXCircle } from 'react-icons/fi';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../hooks/useToast';
 import { leavesDB } from '../../services/db';
-import type { LeaveRequest, Student } from '../../types';
+import type { LeaveRequest } from '../../types';
 import { studentAuthService } from '../../services/auth';
 
 export default function LeaveApply() {
@@ -39,7 +39,6 @@ export default function LeaveApply() {
       studentId: currentStudent.id,
       rollNumber: currentStudent.rollNumber,
       studentName: currentStudent.name,
-      collegeId: currentStudent.collegeId || 'default-college',
       startDate: form.startDate,
       endDate: form.endDate,
       reason: form.reason

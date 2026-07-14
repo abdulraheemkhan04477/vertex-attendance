@@ -2,12 +2,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { FiUsers, FiCheckCircle, FiXCircle, FiClock, FiPercent, FiActivity, FiAlertTriangle, FiCalendar } from 'react-icons/fi';
 import { StatCard } from '../components/ui/StatCard';
-import { Badge } from '../components/ui/Badge';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { attendanceService } from '../services/attendanceService';
 import { analyticsService } from '../services/analyticsService';
 import { studentsDB } from '../services/db';
-import { formatDate, formatDateTime, today } from '../utils/dateUtils';
+import { formatDate, today } from '../utils/dateUtils';
 import { useStore } from '../store/useStore';
 import { format } from 'date-fns';
 
@@ -23,7 +22,6 @@ export default function Dashboard() {
 
   const totalStudents = studentsDB.getAll().length;
   const todayStats = useMemo(() => attendanceService.getTodayStats(todayStr), [todayStr]);
-  const overallStats = useMemo(() => attendanceService.getOverallStats(), []);
   const recentSessions = useMemo(() => attendanceService.getRecentSessions(8), []);
   const lowAttendance = useMemo(() => attendanceService.getLowAttendanceStudents().slice(0, 5), []);
   const summary = useMemo(() => analyticsService.getSummaryStats(), []);

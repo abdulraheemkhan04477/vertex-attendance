@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiUser, FiLock, FiZap, FiEye, FiEyeOff, FiShield } from 'react-icons/fi';
+import { FiUser, FiLock, FiEye, FiEyeOff, FiShield } from 'react-icons/fi';
 import { useAuth } from '../hooks/useAuth';
 import { useStore } from '../store/useStore';
 import { useToast } from '../hooks/useToast';
@@ -14,7 +14,7 @@ export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, _setLoading] = useState(false);
   const [shake, setShake] = useState(false);
 
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;

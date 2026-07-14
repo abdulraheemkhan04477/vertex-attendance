@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { motion } from 'framer-motion';
 import {
   FiSearch, FiSave, FiRefreshCw, FiCheckCircle, FiXCircle, FiFilter,
-  FiDownload, FiUsers, FiChevronLeft, FiChevronRight, FiZap
+  FiDownload, FiUsers, FiChevronLeft, FiChevronRight
 } from 'react-icons/fi';
 import { AttendanceRow } from '../components/attendance/AttendanceRow';
 import { StudentProfile } from '../components/student/StudentProfile';

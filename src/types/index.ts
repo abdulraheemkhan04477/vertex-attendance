@@ -1,19 +1,10 @@
 // ── Interfaces ─────────────────────────────────────────────────
-export interface College {
-  id: string;
-  name: string;
-  code: string;
-  logoUrl?: string;
-  createdAt: string;
-}
-
 export interface Student {
   id: string;
   rollNumber: string;
   name: string;
   department: string;
   semester: string;
-  collegeId?: string; // Links student to a college
   // Extended academic fields
   year: string;        // '1st Year' | '2nd Year' | '3rd Year' | '4th Year'
   branch: string;      // 'EC/ECE' | 'CS/CSE' | etc.
@@ -42,7 +33,6 @@ export interface AttendanceRecord {
   studentId: string;
   rollNumber: string;
   studentName: string;
-  collegeId?: string;
   date: string;
   subject?: string;       // stores academic context: "3rd Year|EC/ECE|Sem 6|General"
   faculty: string;
@@ -59,12 +49,14 @@ export interface AttendanceRecord {
 
 export interface QrSession {
   id: string;
-  collegeId?: string;
+  teacherId?: string;
   year: string;
   branch: string;
   semester: string;
+  subject?: string;
   lectureNumber: number;
   date: string;
+  timestamp?: string;
   expiresAt: string;
   createdBy: string;
 }
@@ -77,7 +69,6 @@ export interface User {
   password?: string;
   role: UserRole;
   name: string;
-  collegeId?: string;
   // Role-specific fields
   email?: string;
   department?: string; // For HODs and Teachers
@@ -92,7 +83,6 @@ export interface AppSettings {
   semester: string;
   facultyName: string;
   theme: 'light' | 'dark';
-  collegeId?: string;
   // Branding
   logoUrl?: string;
   shortName?: string;
@@ -118,7 +108,6 @@ export interface LeaveRequest {
   studentId: string;
   rollNumber: string;
   studentName: string;
-  collegeId: string;
   startDate: string;
   endDate: string;
   reason: string;

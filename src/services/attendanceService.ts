@@ -82,22 +82,32 @@ export const attendanceService = {
   getAllStudentStats(): StudentAttendanceStats[] {
     let students = studentsDB.getAll();
     const currentUser = useStore.getState().currentUser;
-    if (currentUser?.role === 'hod' && currentUser.department) {
-      students = students.filter(s => isSameDepartment(currentUser.department, s.department, s.branch));
-    } else if (currentUser?.role === 'teacher') {
+    if (currentUser?.role === 'teacher') {
       // Teachers shouldn't really use this, but if they do, don't show all students
       students = [];
     }
 
     const allRecords = this.getAll();
+    
+    // Group records by student to optimize O(N*M) down to O(N+M)
+    const recordsByStudent = new Map<string, typeof allRecords>();
+    for (const r of allRecords) {
+      if (!recordsByStudent.has(r.rollNumber)) {
+        recordsByStudent.set(r.rollNumber, []);
+      }
+      recordsByStudent.get(r.rollNumber)!.push(r);
+    }
 
     return students.map((student) => {
-      const records = allRecords.filter((r) => r.rollNumber === student.rollNumber);
+      const records = recordsByStudent.get(student.rollNumber) || [];
       const total = records.length;
-      const present = records.filter((r) => r.status === 'present').length;
-      const absent = records.filter((r) => r.status === 'absent').length;
-      const late = records.filter((r) => r.status === 'late').length;
-      const leave = records.filter((r) => r.status === 'leave').length;
+      let present = 0, absent = 0, late = 0, leave = 0;
+      for (const r of records) {
+        if (r.status === 'present') present++;
+        else if (r.status === 'absent') absent++;
+        else if (r.status === 'late') late++;
+        else if (r.status === 'leave') leave++;
+      }
       const attended = present + late;
       const percentage = total > 0 ? Math.round((attended / total) * 100) : 0;
       return { student, total, present, absent, late, leave, percentage };

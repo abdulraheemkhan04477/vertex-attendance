@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { FiDownload, FiFileText, FiCalendar, FiPrinter, FiFilter } from 'react-icons/fi';
-import { Button } from '../components/ui/Button';
+import { FiFilter } from 'react-icons/fi';
 import { attendanceService } from '../services/attendanceService';
 import { studentsDB } from '../services/db';
 import { exportSummaryToCSV, exportSummaryToExcel, exportSummaryToPDF, printSummary } from '../services/exportService';
@@ -51,9 +50,6 @@ export default function Reports() {
 
   const filteredStudents = useMemo(() => {
     let list = studentsDB.getAll();
-    if (currentUser?.role === 'hod' && currentUser.department) {
-      list = list.filter(s => isSameDepartment(currentUser.department, s.department, s.branch));
-    }
     if (filterBranch) list = list.filter(s => s.branch === filterBranch);
     if (filterYear) list = list.filter(s => s.year === filterYear);
     if (filterSemester) list = list.filter(s => s.semester === filterSemester);

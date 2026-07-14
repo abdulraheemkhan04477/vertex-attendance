@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, LineChart, Line
+  Legend, ResponsiveContainer
 } from 'recharts';
 import { FiAlertTriangle, FiTrendingUp, FiAward, FiActivity } from 'react-icons/fi';
 import { StatCard } from '../components/ui/StatCard';
-import { Badge } from '../components/ui/Badge';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { analyticsService } from '../services/analyticsService';
 import { attendanceService } from '../services/attendanceService';
