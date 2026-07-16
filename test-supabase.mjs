@@ -11,30 +11,14 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function test() {
-  console.log("Fetching students...");
-  const { data, error } = await supabase.from('students').select('*').limit(1);
-  if (error) {
-    console.error("Fetch error:", error);
-  } else {
-    console.log("Fetch success:", data);
-  }
-
-  console.log("Attempting to insert a fake student...");
-  const fakeStudent = {
-    id: "test-" + Date.now(),
-    roll_number: "TEST-001",
-    name: "Test Student",
-    updated_at: new Date().toISOString()
-  };
+  const { data: students } = await supabase.from('students').select('branch').limit(500);
+  console.log("Branches in students table:", [...new Set(students.map(s => s.branch))]);
   
-  const { data: insertData, error: insertError } = await supabase.from('students').insert(fakeStudent).select();
-  if (insertError) {
-    console.error("Insert error:", insertError);
-  } else {
-    console.log("Insert success:", insertData);
-    
-    // Cleanup
-    await supabase.from('students').delete().eq('id', fakeStudent.id);
+  const { data: appSettings } = await supabase.from('app_settings').select('value').eq('key', 'users');
+  if (appSettings && appSettings.length > 0) {
+    const users = appSettings[0].value;
+    const teachers = users.filter(u => u.role === 'teacher');
+    console.log("Teacher assigned branches:", JSON.stringify(teachers.map(t => ({ name: t.name, username: t.username, branches: t.assignedClasses?.map(c => c.branch) }))));
   }
 }
 

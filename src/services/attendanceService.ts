@@ -7,18 +7,11 @@ function getFilteredRecords(records: AttendanceRecord[]): AttendanceRecord[] {
   const currentUser = useStore.getState().currentUser;
   if (!currentUser) return records;
 
-  if (currentUser.role === 'hod' && currentUser.department) {
+  if (currentUser.role === 'hod' || currentUser.role === 'teacher') {
     const validRollNumbers = new Set(
-      studentsDB.getAll().filter(s => isSameDepartment(currentUser.department, s.department, s.branch)).map(s => s.rollNumber)
+      studentsDB.getAll().map(s => s.rollNumber)
     );
     return records.filter(r => validRollNumbers.has(r.rollNumber));
-  }
-  
-  if (currentUser.role === 'teacher' && currentUser.assignedClasses) {
-    const validSubjects = new Set(
-      currentUser.assignedClasses.map(c => `${c.year}|${c.branch}|${c.semester}`)
-    );
-    return records.filter(r => r.subject && validSubjects.has(r.subject));
   }
 
   return records;

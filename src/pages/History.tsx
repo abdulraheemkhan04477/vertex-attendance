@@ -60,9 +60,9 @@ export default function History() {
     toast.success('Attendance record updated');
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this record?')) {
-      attendanceDB.delete(id);
+      await attendanceDB.delete(id);
       setRefreshKey((k) => k + 1);
       toast.success('Attendance record deleted');
     }

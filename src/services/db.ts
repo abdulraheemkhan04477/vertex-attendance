@@ -11,7 +11,7 @@
 import type { Student, AttendanceRecord, AppSettings, User } from '../types';
 import { STUDENTS_DATA } from '../data/students';
 import { supabase, isSupabaseConfigured } from './supabase';
-import { isSameDepartment } from '../utils/departmentUtils';
+import { isSameDepartment, normalizeDepartment } from '../utils/departmentUtils';
 
 const KEYS = {
   STUDENTS: 'vertex_students',
@@ -221,32 +221,20 @@ export async function syncFromCloud(): Promise<void> {
 
       const studentsObj = getObj('students') as Student[] | undefined;
       if (studentsObj) {
-        const studentMap = new Map();
-        baseStudents.forEach(s => {
-          const loc = localStudents.find(ls => ls.id === s.id);
-          studentMap.set(s.id, s);
-        });
-        studentsObj.forEach(s => studentMap.set(s.id, s));
-        setItem(KEYS.STUDENTS, Array.from(studentMap.values()));
+        setItem(KEYS.STUDENTS, studentsObj);
       } else if (baseStudents.length > 0) {
         baseStudents.forEach(s => {
-          const loc = localStudents.find(ls => ls.id === s.id);
+          const loc = localStudents.find(ls => ls.id === s.id);
         });
         setItem(KEYS.STUDENTS, baseStudents);
       }
 
       const attendanceObj = getObj('attendance') as AttendanceRecord[] | undefined;
       if (attendanceObj) {
-        const attMap = new Map();
-        baseAttendance.forEach(a => {
-          const loc = localAtt.find(la => la.id === a.id);
-          attMap.set(a.id, a);
-        });
-        attendanceObj.forEach(a => attMap.set(a.id, a));
-        setItem(KEYS.ATTENDANCE, Array.from(attMap.values()));
+        setItem(KEYS.ATTENDANCE, attendanceObj);
       } else if (baseAttendance.length > 0) {
         baseAttendance.forEach(a => {
-          const loc = localAtt.find(la => la.id === a.id);
+          const loc = localAtt.find(la => la.id === a.id);
         });
         setItem(KEYS.ATTENDANCE, baseAttendance);
       }
@@ -467,12 +455,20 @@ export const studentsDB = {
   getAll(): Student[] {
     let items = getItem<Student>(KEYS.STUDENTS);
     
-    // Backend-level enforcement of HOD filtering
+    // Backend-level enforcement of HOD and Teacher filtering
     const token = authDB.getToken();
     if (token) {
       const currentUser = usersDB.getById(token);
       if (currentUser?.role === 'hod' && currentUser.department) {
         items = items.filter((s) => isSameDepartment(currentUser.department, s.department, s.branch));
+      } else if (currentUser?.role === 'teacher') {
+        const assignedBranches = (currentUser.assignedClasses || []).map((c: any) => normalizeDepartment(c.branch));
+        items = items.filter((s) => {
+          const sBranch = normalizeDepartment(s.branch);
+          if (assignedBranches.includes(sBranch)) return true;
+          if (currentUser.department && isSameDepartment(currentUser.department, s.department, s.branch)) return true;
+          return false;
+        });
       }
     }
     
@@ -617,7 +613,7 @@ export const attendanceDB = {
     }
   },
 
-  deleteSession(date: string, subject: string, lectureNumber: number): void {
+  async deleteSession(date: string, subject: string, lectureNumber: number): Promise<void> {
     const all = this.getAll();
     const toDelete = all.filter(
       (r) => r.date === date && r.subject === subject && r.lectureNumber === lectureNumber,
@@ -633,6 +629,10 @@ export const attendanceDB = {
       supabase.from('attendance_records').delete().in('id', ids).then(({ error }) => {
         if (error) console.warn('[DB] Supabase delete session error:', error.message);
       });
+      supabase.from('app_settings').upsert({ key: 'attendance', value: filtered }).then(({ error }) => {
+        if (error) console.warn('[DB] Supabase app_settings sync attendance error:', error.message);
+      });
+      // Fire and forget so UI doesn't block
     }
   },
 
@@ -654,7 +654,7 @@ export const attendanceDB = {
     }
   },
 
-  delete(id: string): void {
+  async delete(id: string): Promise<void> {
     const all = getItem<AttendanceRecord>(KEYS.ATTENDANCE);
     const filtered = all.filter((r) => r.id !== id);
     setItem<AttendanceRecord>(KEYS.ATTENDANCE, filtered);

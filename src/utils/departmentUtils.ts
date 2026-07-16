@@ -59,6 +59,7 @@ export function normalizeDepartment(dept: string | undefined): string {
       
     case 'biotech':
     case 'bio':
+    case 'bt':
     case 'biotechnology':
       return 'biotech';
       
