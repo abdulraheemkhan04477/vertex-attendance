@@ -12,6 +12,7 @@ import { Button } from '../../components/ui/Button';
 
 export default function StudentDashboard() {
   const [student, setStudent] = useState(studentAuthService.getCurrentStudent());
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
@@ -31,6 +32,7 @@ export default function StudentDashboard() {
     const handleStorage = () => {
       const updated = studentAuthService.getCurrentStudent();
       if (updated) setStudent(updated);
+      setRefreshTrigger(prev => prev + 1);
     };
     window.addEventListener('local-storage', handleStorage);
     window.addEventListener('storage', handleStorage);
@@ -44,13 +46,13 @@ export default function StudentDashboard() {
   const history = useMemo(() => {
     return student ? attendanceService.getStudentHistory(student.rollNumber) : [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [student?.rollNumber]);
+  }, [student?.rollNumber, refreshTrigger]);
   
   const stats = useMemo(() => {
     const s = student ? attendanceService.getStudentStats(student.rollNumber) : null;
     return s || { present: 0, absent: 0, late: 0, leave: 0, total: 0, percentage: 0 };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [student?.rollNumber, history.length]);
+  }, [student?.rollNumber, history.length, refreshTrigger]);
   if (!student) return null;
 
   const handleProfileUpdate = () => {

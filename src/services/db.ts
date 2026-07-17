@@ -623,16 +623,13 @@ export const attendanceDB = {
     );
     setItem<AttendanceRecord>(KEYS.ATTENDANCE, filtered);
 
-    // Background cloud delete
+    // Cloud delete - MUST await so it's committed before any refresh
     if (isSupabaseConfigured && supabase && toDelete.length > 0) {
       const ids = toDelete.map((r) => r.id);
-      supabase.from('attendance_records').delete().in('id', ids).then(({ error }) => {
-        if (error) console.warn('[DB] Supabase delete session error:', error.message);
-      });
-      supabase.from('app_settings').upsert({ key: 'attendance', value: filtered }).then(({ error }) => {
-        if (error) console.warn('[DB] Supabase app_settings sync attendance error:', error.message);
-      });
-      // Fire and forget so UI doesn't block
+      await Promise.allSettled([
+        supabase.from('attendance_records').delete().in('id', ids),
+        supabase.from('app_settings').upsert({ key: 'attendance', value: filtered })
+      ]);
     }
   },
 
@@ -658,14 +655,12 @@ export const attendanceDB = {
     const all = getItem<AttendanceRecord>(KEYS.ATTENDANCE);
     const filtered = all.filter((r) => r.id !== id);
     setItem<AttendanceRecord>(KEYS.ATTENDANCE, filtered);
-    // Background cloud delete
+    // Cloud delete - MUST await so it's committed before any refresh
     if (isSupabaseConfigured && supabase) {
-      supabase.from('attendance_records').delete().eq('id', id).then(({ error }) => {
-        if (error) console.warn('[DB] Supabase delete attendance error:', error.message);
-      });
-      supabase.from('app_settings').upsert({ key: 'attendance', value: filtered }).then(({ error }) => {
-        if (error) console.warn('[DB] Supabase app_settings sync attendance error:', error.message);
-      });
+      await Promise.allSettled([
+        supabase.from('attendance_records').delete().eq('id', id),
+        supabase.from('app_settings').upsert({ key: 'attendance', value: filtered })
+      ]);
     }
   },
 };

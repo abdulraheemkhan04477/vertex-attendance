@@ -26,6 +26,42 @@ export default function Dashboard() {
   const lowAttendance = useMemo(() => attendanceService.getLowAttendanceStudents().slice(0, 5), []);
   const summary = useMemo(() => analyticsService.getSummaryStats(), []);
 
+  const branchStats = useMemo(() => {
+    const students = studentsDB.getAll();
+    const todayRecords = attendanceService.getByDate(todayStr);
+
+    const branchTotals: Record<string, number> = {};
+    students.forEach(s => {
+      if (!branchTotals[s.branch]) branchTotals[s.branch] = 0;
+      branchTotals[s.branch]++;
+    });
+
+    const uniquePresentToday = new Set<string>();
+    todayRecords.forEach(r => {
+      if (r.status === 'present' || r.status === 'late') {
+        uniquePresentToday.add(r.rollNumber);
+      }
+    });
+
+    const branchPresent: Record<string, number> = {};
+    students.forEach(s => {
+      if (!branchPresent[s.branch]) branchPresent[s.branch] = 0;
+      if (uniquePresentToday.has(s.rollNumber)) {
+        branchPresent[s.branch]++;
+      }
+    });
+
+    const stats = Object.keys(branchTotals).map(branch => {
+      const total = branchTotals[branch];
+      const present = branchPresent[branch] || 0;
+      const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
+      return { branch, total, present, percentage };
+    });
+
+    stats.sort((a, b) => b.percentage - a.percentage);
+    return stats;
+  }, [todayStr, time]);
+
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
@@ -180,38 +216,74 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Low Attendance Warning */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
-          <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-            <FiAlertTriangle className="text-orange-500 w-4 h-4" />
-            <h3 className="text-base font-bold text-gray-800 dark:text-white">Low Attendance</h3>
-            {lowAttendance.length > 0 && (
-              <span className="ml-auto text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full font-semibold">
-                {lowAttendance.length}
-              </span>
+        {/* Right Column */}
+        <div className="flex flex-col gap-6">
+          {/* Low Attendance Warning */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <FiAlertTriangle className="text-orange-500 w-4 h-4" />
+              <h3 className="text-base font-bold text-gray-800 dark:text-white">Low Attendance</h3>
+              {lowAttendance.length > 0 && (
+                <span className="ml-auto text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full font-semibold">
+                  {lowAttendance.length}
+                </span>
+              )}
+            </div>
+            {lowAttendance.length === 0 ? (
+              <div className="py-12 text-center px-4">
+                <FiCheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-400">All students above 75%</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50 dark:divide-gray-700">
+                {lowAttendance.map((s) => (
+                  <div key={s.student.rollNumber} className="px-4 py-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{s.student.name}</p>
+                        <p className="text-xs text-gray-400 font-mono">{s.student.rollNumber}</p>
+                      </div>
+                      <span className="text-sm font-black text-red-500 flex-shrink-0 ml-2">{s.percentage}%</span>
+                    </div>
+                    <ProgressBar value={s.percentage} size="sm" />
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-          {lowAttendance.length === 0 ? (
-            <div className="py-12 text-center px-4">
-              <FiCheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-400">All students above 75%</p>
+
+          {/* Today's Branch Attendance */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <FiActivity className="text-indigo-500 w-4 h-4" />
+              <h3 className="text-base font-bold text-gray-800 dark:text-white">Today's Branch Attendance</h3>
             </div>
-          ) : (
-            <div className="divide-y divide-gray-50 dark:divide-gray-700">
-              {lowAttendance.map((s) => (
-                <div key={s.student.rollNumber} className="px-4 py-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{s.student.name}</p>
-                      <p className="text-xs text-gray-400 font-mono">{s.student.rollNumber}</p>
+            {branchStats.length === 0 ? (
+              <div className="py-12 text-center px-4">
+                <FiCheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-400">No branch data available</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50 dark:divide-gray-700">
+                {branchStats.map((b) => (
+                  <div key={b.branch} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{b.branch}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {b.present} / {b.total} Students
+                      </p>
                     </div>
-                    <span className="text-sm font-black text-red-500 flex-shrink-0 ml-2">{s.percentage}%</span>
+                    <div className="text-right flex items-center gap-3">
+                      <div className="w-16 hidden sm:block">
+                        <ProgressBar value={b.percentage} size="sm" />
+                      </div>
+                      <span className="text-sm font-black text-indigo-600 dark:text-indigo-400 w-10 text-right">{b.percentage}%</span>
+                    </div>
                   </div>
-                  <ProgressBar value={s.percentage} size="sm" />
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

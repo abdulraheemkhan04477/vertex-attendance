@@ -6,7 +6,9 @@ import { useToast } from '../hooks/useToast';
 import { today } from '../utils/dateUtils';
 import { useStore } from '../store/useStore';
 import { QRCodeSVG } from 'qrcode.react';
-import { studentsDB, qrSessionsDB, usersDB } from '../services/db';
+import { qrSessionsDB } from '../services/db';
+import { YEARS, BRANCHES, SEMESTERS_BY_YEAR } from '../types';
+import { isSameDepartment } from '../utils/departmentUtils';
 
 export default function QRAttendance() {
   const toast = useToast();
@@ -18,52 +20,33 @@ export default function QRAttendance() {
   const [semester, setSemester] = useState('');
   const [lectureNumber, setLectureNumber] = useState(1);
 
-  // Dynamically compute options from existing students AND teachers in the current college
-  const allStudents = useMemo(() => studentsDB.getAll(), []);
-  const allTeachers = useMemo(() => usersDB.getAll().filter(u => u.role === 'teacher' && u.assignedClasses), []);
-
-  const combinedClasses = useMemo(() => {
-    const studentClasses = allStudents.map(s => ({ year: s.year, branch: s.branch, semester: s.semester }));
-    const teacherClassesList = allTeachers.flatMap(t => t.assignedClasses || []);
-    return [...studentClasses, ...teacherClassesList];
-  }, [allStudents, allTeachers]);
-
-  const collegeYears = useMemo(() => [...new Set(combinedClasses.map(c => c.year))].filter(Boolean).sort(), [combinedClasses]);
-  const collegeBranches = useMemo(() => [...new Set(combinedClasses.filter(c => c.year === year).map(c => c.branch))].filter(Boolean).sort(), [combinedClasses, year]);
-  const collegeSemesters = useMemo(() => [...new Set(combinedClasses.filter(c => c.year === year && c.branch === branch).map(c => c.semester))].filter(Boolean).sort(), [combinedClasses, year, branch]);
-
-  // Filter based on teacher's assigned classes
-  const teacherClasses = currentUser?.role === 'teacher' ? currentUser.assignedClasses || [] : [];
+  // Use standard static constants for all branches instead of relying on existing records (fixes Bug 2)
+  const allowedYears = [...YEARS];
   
-  const allowedYears = currentUser?.role === 'teacher' 
-    ? [...new Set(teacherClasses.map(c => c.year))].filter(Boolean).sort()
-    : collegeYears;
-    
-  const allowedBranches = currentUser?.role === 'teacher' 
-    ? [...new Set(teacherClasses.filter(c => c.year === year).map(c => c.branch))].filter(Boolean).sort()
-    : collegeBranches;
-    
-  const allowedSemesters = currentUser?.role === 'teacher' 
-    ? [...new Set(teacherClasses.filter(c => c.year === year && c.branch === branch).map(c => c.semester))].filter(Boolean).sort()
-    : collegeSemesters;
+  // For Bug 1: HOD/Teacher Panel: auto-detect and lock to assigned branch
+  const allowedBranches = useMemo(() => {
+    if ((currentUser?.role === 'hod' || currentUser?.role === 'teacher') && currentUser.department) {
+      // Try to find exact match in BRANCHES or use department string
+      const matched = BRANCHES.find(b => isSameDepartment(b, currentUser.department));
+      return matched ? [matched] : [currentUser.department];
+    }
+    return [...BRANCHES];
+  }, [currentUser]);
+
+  const allowedSemesters = useMemo(() => {
+    return year ? SEMESTERS_BY_YEAR[year] || [] : [];
+  }, [year]);
 
   const fullSubject = useMemo(() => {
     if (!year || !branch || !semester) return '';
     return `${year}|${branch}|${semester}`;
   }, [year, branch, semester]);
 
+  // Bug 1: Auto-select branch if there's only one (e.g. for HODs)
   useEffect(() => {
-    if (allowedYears.length === 1 && !year) setYear(allowedYears[0]);
-  }, [allowedYears, year]);
-
-  useEffect(() => {
-    if (year && allowedBranches.length === 1 && !branch) setBranch(allowedBranches[0]);
+    if (allowedBranches.length === 1 && !branch) setBranch(allowedBranches[0]);
     if (year && currentUser?.role !== 'teacher') setSemester(''); // Reset for admins
-  }, [year, branch, allowedBranches, currentUser?.role]);
-
-  useEffect(() => {
-    if (branch && allowedSemesters.length === 1 && !semester) setSemester(allowedSemesters[0]);
-  }, [branch, semester, allowedSemesters]);
+  }, [allowedBranches, branch, year, currentUser?.role]);
 
   const [qrSessionId, setQrSessionId] = useState<string | null>(null);
 
@@ -82,7 +65,7 @@ export default function QRAttendance() {
       date,
       timestamp: new Date().toISOString(),
       expiresAt,
-      createdBy: settings.facultyName
+      createdBy: currentUser?.name || settings.facultyName || 'Default Faculty'
     };
     qrSessionsDB.add(session);
     setQrSessionId(JSON.stringify(session));
@@ -121,7 +104,11 @@ export default function QRAttendance() {
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Year</label>
             <select
               value={year}
-              onChange={(e) => { setYear(e.target.value); setBranch(''); setSemester(''); }}
+              onChange={(e) => { 
+                setYear(e.target.value); 
+                if (allowedBranches.length !== 1) setBranch(''); 
+                setSemester(''); 
+              }}
               className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 dark:text-white"
             >
               <option value="">Select Year...</option>

@@ -21,7 +21,7 @@ type FilterType = 'all' | AttendanceStatus;
 
 export default function Attendance() {
   const toast = useToast();
-  const { settings } = useStore();
+  const { settings, currentUser } = useStore();
   const allStudents = useMemo(() => {
     const list = studentsDB.getAll();
     return list.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true }));
@@ -138,7 +138,7 @@ export default function Attendance() {
   const handleSave = useCallback(async () => {
     if (!fullSubject) { toast.error('Please select Year, Branch, and Semester'); return; }
     
-    const faculty = settings.facultyName || 'Default Faculty';
+    const faculty = currentUser?.name || settings.facultyName || 'Default Faculty';
     
     const records = allStudents
       .filter((s) => statusMap[s.rollNumber])
@@ -213,7 +213,7 @@ export default function Attendance() {
     if (!fullSubject) return [];
     return filtered.filter((s) => statusMap[s.rollNumber]).map((s) => ({
       id: '', studentId: s.id, rollNumber: s.rollNumber, studentName: s.name,
-      date, subject: fullSubject, faculty: settings.facultyName, lectureNumber, status: statusMap[s.rollNumber]!,
+      date, subject: fullSubject, faculty: currentUser?.name || settings.facultyName || 'Default Faculty', lectureNumber, status: statusMap[s.rollNumber]!,
       remarks: remarkMap[s.rollNumber] || '', timestamp: new Date().toISOString(),
     }));
   }, [filtered, statusMap, remarkMap, date, fullSubject, settings.facultyName, lectureNumber]);

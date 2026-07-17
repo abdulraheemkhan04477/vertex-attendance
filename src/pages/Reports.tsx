@@ -21,6 +21,8 @@ export default function Reports() {
   const [customDate, setCustomDate] = useState(todayStr);
   const [customMonth, setCustomMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [loading, setLoading] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'rollNumber' | 'percentage'>('percentage');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Filters
   const [filterBranch, setFilterBranch] = useState('');
@@ -58,7 +60,7 @@ export default function Reports() {
   }, [currentUser, filterBranch, filterYear, filterSemester, filterSection]);
 
   const reportStats = useMemo(() => {
-    return filteredStudents.map((student) => {
+    const stats = filteredStudents.map((student) => {
       const stRecords = records.filter((r) => r.rollNumber === student.rollNumber);
       const total = stRecords.length;
       const present = stRecords.filter((r) => r.status === 'present').length;
@@ -69,7 +71,17 @@ export default function Reports() {
       const percentage = total > 0 ? Math.round((attended / total) * 100) : 0;
       return { student, total, present, absent, late, leave, percentage };
     }).filter(s => s.total > 0 || activeReport === 'semester'); // only show students who have records, except for semester where we show all
-  }, [filteredStudents, records, activeReport]);
+    
+    return stats.sort((a, b) => {
+      if (sortBy === 'percentage') {
+        return sortOrder === 'asc' ? a.percentage - b.percentage : b.percentage - a.percentage;
+      } else {
+        return sortOrder === 'asc' 
+          ? a.student.rollNumber.localeCompare(b.student.rollNumber, undefined, { numeric: true }) 
+          : b.student.rollNumber.localeCompare(a.student.rollNumber, undefined, { numeric: true });
+      }
+    });
+  }, [filteredStudents, records, activeReport, sortBy, sortOrder]);
 
   const getTitle = () => {
     switch (activeReport) {
@@ -255,13 +267,17 @@ export default function Reports() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 dark:bg-gray-900/50 text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold border-b border-gray-100 dark:border-gray-700">
-                <th className="p-3">Roll No</th>
+                <th className="p-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" onClick={() => { setSortBy('rollNumber'); setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); }}>
+                  Roll No {sortBy === 'rollNumber' && (sortOrder === 'asc' ? '↑' : '↓')}
+                </th>
                 <th className="p-3">Name</th>
                 <th className="p-3">Branch</th>
                 <th className="p-3">Total Days</th>
                 <th className="p-3">Present</th>
                 <th className="p-3">Absent</th>
-                <th className="p-3 text-right">Attendance %</th>
+                <th className="p-3 text-right cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" onClick={() => { setSortBy('percentage'); setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); }}>
+                  Attendance % {sortBy === 'percentage' && (sortOrder === 'asc' ? '↑' : '↓')}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -290,7 +306,7 @@ export default function Reports() {
               {reportStats.length > 5 && (
                 <tr>
                   <td colSpan={7} className="p-3 text-center text-xs text-gray-400 bg-gray-50/50 dark:bg-gray-900/20">
-                    Showing 5 of {reportStats.length} students. Export to see full list.
+                    Showing {Math.min(reportStats.length, 5)} of {reportStats.length} students. Export to see full list.
                   </td>
                 </tr>
               )}

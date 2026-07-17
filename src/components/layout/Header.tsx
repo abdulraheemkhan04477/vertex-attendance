@@ -70,10 +70,21 @@ export function Header() {
         {theme === 'dark' ? <FiSun className="w-5 h-5 text-yellow-400" /> : <FiMoon className="w-5 h-5" />}
       </button>
 
-      {/* Avatar */}
-      <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-        {settings.facultyName?.charAt(0)?.toUpperCase() || 'A'}
+      {/* Avatar / Profile */}
+      <div className="flex items-center gap-3">
+        {currentUser && (
+          <div className="hidden sm:flex flex-col items-end">
+            <span className="text-xs text-gray-500 dark:text-gray-400">👤 Welcome,</span>
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+              {currentUser.name}
+            </span>
+          </div>
+        )}
+        <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+          {(currentUser?.name || settings.facultyName)?.charAt(0)?.toUpperCase() || 'A'}
+        </div>
       </div>
     </header>
   );
 }
+
