@@ -229,13 +229,7 @@ export async function syncFromCloud(): Promise<void> {
         setItem(KEYS.STUDENTS, baseStudents);
       }
 
-      const attendanceObj = getObj('attendance') as AttendanceRecord[] | undefined;
-      if (attendanceObj) {
-        setItem(KEYS.ATTENDANCE, attendanceObj);
-      } else if (baseAttendance.length > 0) {
-        baseAttendance.forEach(a => {
-          const loc = localAtt.find(la => la.id === a.id);
-        });
+      if (baseAttendance.length > 0) {
         setItem(KEYS.ATTENDANCE, baseAttendance);
       }
     } else if (baseStudents.length > 0 || baseAttendance.length > 0) {
@@ -607,9 +601,6 @@ export const attendanceDB = {
       supabase.from('attendance_records').upsert(upserted.map(attendanceToRow), { onConflict: 'id' }).then(({ error }) => {
         if (error) console.warn('[DB] Supabase upsert attendance error:', error.message);
       });
-      supabase.from('app_settings').upsert({ key: 'attendance', value: all }).then(({ error }) => {
-        if (error) console.warn('[DB] Supabase app_settings sync attendance error:', error.message);
-      });
     }
   },
 
@@ -626,10 +617,8 @@ export const attendanceDB = {
     // Cloud delete - MUST await so it's committed before any refresh
     if (isSupabaseConfigured && supabase && toDelete.length > 0) {
       const ids = toDelete.map((r) => r.id);
-      await Promise.allSettled([
-        supabase.from('attendance_records').delete().in('id', ids),
-        supabase.from('app_settings').upsert({ key: 'attendance', value: filtered })
-      ]);
+      const { error } = await supabase.from('attendance_records').delete().in('id', ids);
+      if (error) throw error;
     }
   },
 
@@ -644,9 +633,6 @@ export const attendanceDB = {
         supabase.from('attendance_records').update(attendanceToRow(changes)).eq('id', id).then(({ error }) => {
           if (error) console.warn('[DB] Supabase update attendance error:', error.message);
         });
-        supabase.from('app_settings').upsert({ key: 'attendance', value: all }).then(({ error }) => {
-          if (error) console.warn('[DB] Supabase app_settings sync attendance error:', error.message);
-        });
       }
     }
   },
@@ -657,10 +643,8 @@ export const attendanceDB = {
     setItem<AttendanceRecord>(KEYS.ATTENDANCE, filtered);
     // Cloud delete - MUST await so it's committed before any refresh
     if (isSupabaseConfigured && supabase) {
-      await Promise.allSettled([
-        supabase.from('attendance_records').delete().eq('id', id),
-        supabase.from('app_settings').upsert({ key: 'attendance', value: filtered })
-      ]);
+      const { error } = await supabase.from('attendance_records').delete().eq('id', id);
+      if (error) throw error;
     }
   },
 };
@@ -911,7 +895,7 @@ export async function resetAcademicSession(): Promise<void> {
     const results = await Promise.all([
       supabase.from('attendance_records').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
       supabase.from('qr_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-      supabase.from('app_settings').upsert({ key: 'attendance', value: [] }),
+      supabase.from('app_settings').delete().eq('key', 'attendance'),
       supabase.from('app_settings').upsert({ key: 'leaves', value: [] }),
       supabase.from('app_settings').upsert({ key: 'sessions', value: [] }),
     ]);
