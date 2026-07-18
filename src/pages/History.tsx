@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { FiCalendar, FiSearch, FiDownload, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -24,24 +24,34 @@ export default function History() {
   const [profileStudent, setProfileStudent] = useState<typeof allStudents[0] | null>(null);
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  // Tracks IDs optimistically removed from the UI before Supabase confirms
+  const [localDeletedIds, setLocalDeletedIds] = useState<Set<string>>(new Set());
+  // Prevents duplicate delete requests for the same ID
+  const deletingIds = useRef<Set<string>>(new Set());
   const toast = useToast();
 
   // Get records based on view mode
   const records = useMemo((): AttendanceRecord[] => {
+    let base: AttendanceRecord[];
     switch (viewMode) {
       case 'date':
-        return attendanceService.getByDate(selectedDate)
+        base = attendanceService.getByDate(selectedDate)
           .filter((r) => !searchQuery || r.studentName.toLowerCase().includes(searchQuery.toLowerCase()) || r.rollNumber.includes(searchQuery));
+        break;
       case 'student':
-        if (!selectedRoll) return [];
-        return attendanceService.getStudentHistory(selectedRoll).sort((a, b) => b.date.localeCompare(a.date));
+        if (!selectedRoll) { base = []; break; }
+        base = attendanceService.getStudentHistory(selectedRoll).sort((a, b) => b.date.localeCompare(a.date));
+        break;
       case 'calendar':
-        return attendanceService.getAll().filter((r) => r.date.startsWith(`${calYear}-${String(calMonth + 1).padStart(2, '0')}`));
+        base = attendanceService.getAll().filter((r) => r.date.startsWith(`${calYear}-${String(calMonth + 1).padStart(2, '0')}`));
+        break;
       default:
-        return [];
+        base = [];
     }
+    // Optimistically hide records that are being / have been deleted
+    return localDeletedIds.size > 0 ? base.filter((r) => !localDeletedIds.has(r.id)) : base;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, selectedDate, selectedRoll, searchQuery, calYear, calMonth, refreshKey]);
+  }, [viewMode, selectedDate, selectedRoll, searchQuery, calYear, calMonth, refreshKey, localDeletedIds]);
 
   const calDays = useMemo(() => getMonthDays(calYear, calMonth), [calYear, calMonth]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -61,10 +71,29 @@ export default function History() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this record?')) {
+    // Prevent duplicate delete requests for the same record
+    if (deletingIds.current.has(id)) return;
+    if (!confirm('Are you sure you want to delete this record?')) return;
+
+    // Mark as in-flight and optimistically hide from UI immediately
+    deletingIds.current.add(id);
+    setLocalDeletedIds((prev) => new Set(prev).add(id));
+
+    try {
       await attendanceDB.delete(id);
+      // Bump refreshKey so computed stats (totals, percentages) stay in sync
       setRefreshKey((k) => k + 1);
       toast.success('Attendance record deleted');
+    } catch (err) {
+      // Rollback optimistic removal on failure
+      setLocalDeletedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      toast.error('Failed to delete record. Please try again.');
+    } finally {
+      deletingIds.current.delete(id);
     }
   };
 

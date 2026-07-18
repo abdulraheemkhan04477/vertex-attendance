@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { FiFileText, FiCheck, FiX } from 'react-icons/fi';
+import { FiFileText, FiCheck, FiX, FiTrash2 } from 'react-icons/fi';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../hooks/useToast';
 import { leavesDB, studentsDB } from '../services/db';
@@ -28,6 +28,29 @@ export default function Leaves() {
     });
     setLeaves(prev => prev.map(l => l.id === id ? { ...l, status, reviewedBy: currentUser?.name, reviewedAt: new Date().toISOString() } : l));
     toast.success(`Leave ${status} successfully`);
+  };
+
+  // Prevent duplicate delete requests for the same ID
+  const deletingIds = useRef<Set<string>>(new Set());
+
+  const handleDelete = async (id: string) => {
+    if (deletingIds.current.has(id)) return;
+    if (!confirm('Delete this leave request? This cannot be undone.')) return;
+
+    // Optimistically remove from UI immediately
+    deletingIds.current.add(id);
+    setLeaves((prev) => prev.filter((l) => l.id !== id));
+
+    try {
+      await leavesDB.delete(id);
+      toast.success('Leave request deleted');
+    } catch (err) {
+      // Rollback on failure
+      setLeaves(leavesDB.getAll());
+      toast.error('Failed to delete leave request. Please try again.');
+    } finally {
+      deletingIds.current.delete(id);
+    }
   };
 
   const filteredLeaves = leaves.filter(l => filter === 'all' || l.status === filter).sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime());
@@ -129,6 +152,14 @@ export default function Leaves() {
                           </Button>
                         </>
                       )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDelete(leave.id)}
+                        className="text-red-500 border-red-200 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-900/20"
+                      >
+                        <FiTrash2 />
+                      </Button>
                     </td>
                   </motion.tr>
                 ))

@@ -158,7 +158,6 @@ export default function Attendance() {
       }));
     if (records.length === 0) { toast.warning('Please mark at least one student'); return; }
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 500));
     attendanceService.saveSession(records);
     setSaving(false);
     toast.success(`✅ Attendance saved for ${records.length} students!`);
