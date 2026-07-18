@@ -219,10 +219,7 @@ export async function syncFromCloud(): Promise<void> {
       const localStudents = getItem<Student>(KEYS.STUDENTS) || [];
       const localAtt = getItem<AttendanceRecord>(KEYS.ATTENDANCE) || [];
 
-      const studentsObj = getObj('students') as Student[] | undefined;
-      if (studentsObj) {
-        setItem(KEYS.STUDENTS, studentsObj);
-      } else if (baseStudents.length > 0) {
+      if (baseStudents.length > 0) {
         baseStudents.forEach(s => {
           const loc = localStudents.find(ls => ls.id === s.id);
         });
@@ -490,9 +487,6 @@ export const studentsDB = {
       supabase.from('students').insert(studentToRow(newStudent)).then(({ error }) => {
         if (error) console.warn('[DB] Supabase insert student error:', error.message);
       });
-      supabase.from('app_settings').upsert({ key: 'students', value: all }).then(({ error }) => {
-        if (error) console.warn('[DB] Supabase app_settings sync student error:', error.message);
-      });
     }
     return newStudent;
   },
@@ -508,9 +502,6 @@ export const studentsDB = {
         supabase.from('students').update(studentToRow(updates)).eq('id', id).then(({ error }) => {
           if (error) console.warn('[DB] Supabase update student error:', error.message);
         });
-        supabase.from('app_settings').upsert({ key: 'students', value: all }).then(({ error }) => {
-          if (error) console.warn('[DB] Supabase app_settings sync student error:', error.message);
-        });
       }
     }
   },
@@ -523,9 +514,6 @@ export const studentsDB = {
     if (isSupabaseConfigured && supabase) {
       supabase.from('students').delete().eq('id', id).then(({ error }) => {
         if (error) console.warn('[DB] Supabase delete student error:', error.message);
-      });
-      supabase.from('app_settings').upsert({ key: 'students', value: filtered }).then(({ error }) => {
-        if (error) console.warn('[DB] Supabase app_settings sync student error:', error.message);
       });
     }
   },
@@ -652,7 +640,12 @@ export const attendanceDB = {
 // ─── Settings ─────────────────────────────────────────────────────────────────
 export const settingsDB = {
   get(): AppSettings {
-    return getObject<AppSettings>(KEYS.SETTINGS, DEFAULT_SETTINGS);
+    const saved = getObject<AppSettings>(KEYS.SETTINGS, DEFAULT_SETTINGS);
+    if (!saved.logoUrl) saved.logoUrl = '/college-logo.jpg';
+    if (!saved.collegeLogo) saved.collegeLogo = '/college-logo.jpg';
+    if (!saved.loginLogo) saved.loginLogo = '/college-logo.jpg';
+    if (!saved.dashboardLogo) saved.dashboardLogo = '/college-logo.jpg';
+    return saved;
   },
 
   save(settings: AppSettings): void {

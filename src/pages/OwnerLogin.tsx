@@ -91,8 +91,8 @@ export default function OwnerLogin() {
           transition={{ duration: 0.6 }}
           className="text-center mb-8"
         >
-          <div className="w-20 h-20 bg-red-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl shadow-red-900/50">
-            {needsSetup ? <FiShield className="w-10 h-10 text-white" /> : <FiZap className="w-10 h-10 text-white" />}
+          <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl shadow-red-900/50 overflow-hidden">
+            <img src="/college-logo.jpg" alt="College Logo" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-2xl font-black text-white mb-1">System Owner</h1>
           <p className="text-red-300 text-sm">

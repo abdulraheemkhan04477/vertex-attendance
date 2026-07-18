@@ -110,7 +110,7 @@ export default function Reports() {
     try {
       if (type === 'csv') exportSummaryToCSV(reportStats, filename);
       else if (type === 'excel') exportSummaryToExcel(reportStats, filename);
-      else if (type === 'pdf') exportSummaryToPDF(reportStats, title);
+      else if (type === 'pdf') await exportSummaryToPDF(reportStats, title);
       else if (type === 'print') printSummary(reportStats, title);
       toast.success('Report generated successfully!');
     } catch {

@@ -4,6 +4,32 @@ import * as XLSX from 'xlsx';
 import type { AttendanceRecord, StudentAttendanceStats } from '../types';
 import { settingsDB } from './db';
 
+async function loadLogoImage(url: string): Promise<string | null> {
+  if (!url) return null;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        } else {
+          resolve(null);
+        }
+      } catch (e) {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
 // ─── RAW EXPORTS ──────────────────────────────────────────────────────────────
 
 export function exportToCSV(records: AttendanceRecord[], filename: string): void {
@@ -50,22 +76,30 @@ export function exportToExcel(records: AttendanceRecord[], filename: string, she
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
-export function exportToPDF(records: AttendanceRecord[], title: string): void {
+export async function exportToPDF(records: AttendanceRecord[], title: string): Promise<void> {
   const settings = settingsDB.get();
   const doc = new jsPDF({ orientation: 'landscape' });
+  const logoDataUrl = await loadLogoImage(settings.logoUrl || '');
+
+  let startY = 15;
+  if (logoDataUrl) {
+    const logoSize = 22;
+    doc.addImage(logoDataUrl, 'PNG', (doc.internal.pageSize.width / 2) - (logoSize / 2), 5, logoSize, logoSize);
+    startY = 35;
+  }
 
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(settings.instituteName, doc.internal.pageSize.width / 2, 15, { align: 'center' });
+  doc.text(settings.instituteName, doc.internal.pageSize.width / 2, startY, { align: 'center' });
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Department: ${settings.department} | Semester: ${settings.semester}`, doc.internal.pageSize.width / 2, 22, { align: 'center' });
+  doc.text(`Department: ${settings.department} | Semester: ${settings.semester}`, doc.internal.pageSize.width / 2, startY + 7, { align: 'center' });
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.text(title, doc.internal.pageSize.width / 2, 32, { align: 'center' });
+  doc.text(title, doc.internal.pageSize.width / 2, startY + 17, { align: 'center' });
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, 14, 40);
+  doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, 14, startY + 25);
 
   const tableData = records.map((r, i) => [
     i + 1,
@@ -80,12 +114,23 @@ export function exportToPDF(records: AttendanceRecord[], title: string): void {
   ]);
 
   autoTable(doc, {
-    startY: 45,
+    startY: startY + 30,
     head: [['#', 'Roll No', 'Name', 'Date', 'Subject', 'Faculty', 'Lec', 'Status', 'Remarks']],
     body: tableData,
     headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold', fontSize: 9 },
     bodyStyles: { fontSize: 8 },
     alternateRowStyles: { fillColor: [245, 247, 255] },
+    didDrawPage: () => {
+      if (logoDataUrl) {
+        const pageSize = doc.internal.pageSize;
+        const pageWidth = pageSize.width ? pageSize.width : pageSize.getWidth();
+        const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
+        const logoSize = 100;
+        doc.setGState(new (doc as any).GState({ opacity: 0.08 }));
+        doc.addImage(logoDataUrl, 'PNG', (pageWidth / 2) - (logoSize / 2), (pageHeight / 2) - (logoSize / 2), logoSize, logoSize);
+        doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
+      }
+    },
     didParseCell: (data) => {
       if (data.column.index === 7) {
         const v = String(data.cell.raw);
@@ -152,23 +197,31 @@ export function exportSummaryToExcel(stats: StudentAttendanceStats[], filename: 
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
-export function exportSummaryToPDF(stats: StudentAttendanceStats[], title: string): void {
+export async function exportSummaryToPDF(stats: StudentAttendanceStats[], title: string): Promise<void> {
   const settings = settingsDB.get();
   const doc = new jsPDF({ orientation: 'landscape' });
+  const logoDataUrl = await loadLogoImage(settings.logoUrl || '');
+
+  let startY = 15;
+  if (logoDataUrl) {
+    const logoSize = 22;
+    doc.addImage(logoDataUrl, 'PNG', (doc.internal.pageSize.width / 2) - (logoSize / 2), 5, logoSize, logoSize);
+    startY = 35;
+  }
 
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(settings.instituteName, doc.internal.pageSize.width / 2, 15, { align: 'center' });
+  doc.text(settings.instituteName, doc.internal.pageSize.width / 2, startY, { align: 'center' });
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Department: ${settings.department}`, doc.internal.pageSize.width / 2, 22, { align: 'center' });
-  doc.text(`Semester: ${settings.semester}`, doc.internal.pageSize.width / 2, 28, { align: 'center' });
+  doc.text(`Department: ${settings.department}`, doc.internal.pageSize.width / 2, startY + 7, { align: 'center' });
+  doc.text(`Semester: ${settings.semester}`, doc.internal.pageSize.width / 2, startY + 13, { align: 'center' });
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.text(title, doc.internal.pageSize.width / 2, 38, { align: 'center' });
+  doc.text(title, doc.internal.pageSize.width / 2, startY + 23, { align: 'center' });
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, 14, 45);
+  doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, 14, startY + 30);
 
   const tableData = stats.map((s, i) => [
     i + 1,
@@ -185,12 +238,23 @@ export function exportSummaryToPDF(stats: StudentAttendanceStats[], title: strin
   ]);
 
   autoTable(doc, {
-    startY: 50,
+    startY: startY + 35,
     head: [['#', 'Roll No', 'Name', 'Branch', 'Year', 'Sem', 'Sec', 'Total', 'Present', 'Absent', '%']],
     body: tableData,
     headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold', fontSize: 9 },
     bodyStyles: { fontSize: 8 },
     alternateRowStyles: { fillColor: [245, 247, 255] },
+    didDrawPage: () => {
+      if (logoDataUrl) {
+        const pageSize = doc.internal.pageSize;
+        const pageWidth = pageSize.width ? pageSize.width : pageSize.getWidth();
+        const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
+        const logoSize = 100;
+        doc.setGState(new (doc as any).GState({ opacity: 0.08 }));
+        doc.addImage(logoDataUrl, 'PNG', (pageWidth / 2) - (logoSize / 2), (pageHeight / 2) - (logoSize / 2), logoSize, logoSize);
+        doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
+      }
+    },
     didParseCell: (data) => {
       if (data.column.index === 10) {
         const pct = parseInt(String(data.cell.raw));
@@ -235,13 +299,27 @@ export function printSummary(stats: StudentAttendanceStats[], title: string): vo
   const html = `
     <html><head><title>${title}</title>
     <style>
-      body { font-family: Arial, sans-serif; padding: 20px; }
+      body { font-family: Arial, sans-serif; padding: 20px; position: relative; min-height: 100vh; }
       h2, h3, p { text-align: center; margin: 4px 0; }
       table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
       th { background: #4f46e5; color: #fff; padding: 8px 6px; }
       td { border: 1px solid #e2e8f0; padding: 6px; }
+      @media print {
+        .watermark {
+          position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+          opacity: 0.08; z-index: -9999; width: 60%; max-width: 500px; pointer-events: none;
+        }
+      }
+      @media screen {
+        .watermark {
+          position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+          opacity: 0.08; z-index: -9999; width: 60%; max-width: 500px; pointer-events: none;
+        }
+      }
     </style></head>
     <body>
+      ${settings.logoUrl ? `<img src="${settings.logoUrl}" class="watermark" />` : ''}
+      ${settings.logoUrl ? `<div style="text-align: center; margin-bottom: 15px;"><img src="${settings.logoUrl}" style="height: 60px; object-fit: contain;" /></div>` : ''}
       <h2>${settings.instituteName}</h2>
       <h3>${settings.department}</h3>
       <p>${settings.semester}</p>
