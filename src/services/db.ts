@@ -728,6 +728,16 @@ export const leavesDB = {
       }
     }
   },
+
+  async delete(id: string): Promise<void> {
+    const all = this.getAll();
+    const filtered = all.filter((l) => l.id !== id);
+    setItem('vertex_leaves', filtered);
+    // Sync to cloud
+    if (isSupabaseConfigured && supabase) {
+      await supabase.from('app_settings').upsert({ key: 'leaves', value: filtered });
+    }
+  },
 };
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
@@ -881,3 +891,68 @@ export const authDB = {
     localStorage.removeItem(KEYS.STUDENT_AUTH);
   },
 };
+
+// ─── Production Reset ─────────────────────────────────────────────────────────
+/**
+ * Clears all attendance, QR session, leave, and login-session data from
+ * localStorage, the in-memory cache, and Supabase.
+ *
+ * This is the JavaScript companion to supabase_production_reset.sql.
+ * Run from the browser console:
+ *   import('/src/services/db.ts').then(m => m.resetAcademicSession())
+ *
+ * ⚠️  Irreversible — ensure you have run the SQL backup first.
+ */
+export async function resetAcademicSession(): Promise<void> {
+  // 3. Sync erasure to Supabase
+  if (isSupabaseConfigured && supabase) {
+    // We use a valid UUID format for `neq` since the columns might be of type UUID in Supabase.
+    // We also use Promise.all and check for errors to ensure it actually succeeded.
+    const results = await Promise.all([
+      supabase.from('attendance_records').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+      supabase.from('qr_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+      supabase.from('app_settings').upsert({ key: 'attendance', value: [] }),
+      supabase.from('app_settings').upsert({ key: 'leaves', value: [] }),
+      supabase.from('app_settings').upsert({ key: 'sessions', value: [] }),
+    ]);
+
+    for (const res of results) {
+      if (res.error) {
+        console.error('[DB] Failed to reset data in Supabase:', res.error);
+        throw new Error(`Failed to reset cloud data: ${res.error.message}`);
+      }
+    }
+    
+    // Verify deletion
+    const [{ count: attCount, error: attError }, { count: qrCount, error: qrError }] = await Promise.all([
+      supabase.from('attendance_records').select('*', { count: 'exact', head: true }),
+      supabase.from('qr_sessions').select('*', { count: 'exact', head: true }),
+    ]);
+
+    if (attError) throw new Error(`Verification failed for attendance: ${attError.message}`);
+    if (qrError) throw new Error(`Verification failed for QR sessions: ${qrError.message}`);
+
+    if (attCount !== 0 || qrCount !== 0) {
+      throw new Error(`Reset failed. Data still exists: ${attCount} attendance records, ${qrCount} QR sessions.`);
+    }
+  }
+  
+  // 1. Clear localStorage
+  localStorage.removeItem(KEYS.ATTENDANCE);
+  localStorage.removeItem(KEYS.QR_SESSIONS);
+  localStorage.removeItem('vertex_leaves');
+  localStorage.removeItem('vertex_sessions');
+
+  // 2. Clear in-memory cache for these keys
+  delete memoryCache[KEYS.ATTENDANCE];
+  delete memoryCache[KEYS.QR_SESSIONS];
+  delete memoryCache['vertex_leaves'];
+  delete memoryCache['vertex_sessions'];
+
+  console.info('[DB] Academic session reset complete. Reloading...');
+  
+  // Refresh UI immediately
+  setTimeout(() => {
+    window.location.reload();
+  }, 500);
+}

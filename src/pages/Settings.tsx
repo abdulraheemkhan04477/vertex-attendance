@@ -1,15 +1,14 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FiSave, FiSun, FiMoon, FiUser, FiInfo, FiBell, FiShield, FiLogOut, FiMail } from 'react-icons/fi';
+import { FiSave, FiSun, FiMoon, FiUser, FiInfo, FiBell, FiShield, FiLogOut, FiMail, FiAlertTriangle } from 'react-icons/fi';
 import { Button } from '../components/ui/Button';
 import { useStore } from '../store/useStore';
 import { useToast } from '../hooks/useToast';
 import type { AppSettings } from '../types';
 import { authService } from '../services/auth';
-import { usersDB } from '../services/db';
+import { usersDB, authDB, resetAcademicSession } from '../services/db';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../hooks/useAuth';
-import { authDB } from '../services/db';
 
 export default function Settings() {
   const { settings, updateSettings, theme, toggleTheme: _toggleTheme, currentUser, setCurrentUser } = useStore();
@@ -21,7 +20,24 @@ export default function Settings() {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const lastChanged = authService.getLastPasswordChange();
+
+  const handleResetSession = async () => {
+    if (!confirm('DANGER: This will delete ALL attendance and leave records permanently from the cloud and local storage. User accounts will NOT be deleted. Are you absolutely sure?')) return;
+    if (!confirm('FINAL WARNING: This action cannot be undone. Type OK to continue.') === false) return; // double confirmation
+    
+    setIsResetting(true);
+    toast.info('Starting production reset...');
+    try {
+      await resetAcademicSession();
+      toast.success('Reset completed successfully! Reloading...');
+      // page will reload automatically
+    } catch (error: any) {
+      toast.error(`Reset failed: ${error.message}`);
+      setIsResetting(false);
+    }
+  };
 
   const handleChange = (key: keyof AppSettings, value: string | number) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -420,6 +436,39 @@ export default function Settings() {
           </div>
         </motion.div>
       </div>
+
+      {/* Danger Zone (Super Admin only) */}
+      {currentUser?.role === 'superadmin' && (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="bg-white dark:bg-gray-800 rounded-2xl border border-red-200 dark:border-red-900 shadow-sm overflow-hidden mt-5"
+      >
+        <div className="px-6 py-4 border-b border-red-100 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 flex items-center gap-2">
+          <FiAlertTriangle className="text-red-600 dark:text-red-400 w-5 h-5" />
+          <h3 className="text-base font-bold text-red-800 dark:text-red-400">Danger Zone</h3>
+        </div>
+        <div className="p-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h4 className="font-bold text-gray-800 dark:text-white">Reset Academic Session</h4>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xl">
+                Permanently delete all attendance, QR sessions, and leave records to prepare for a new academic year. This operation executes against the cloud database and cannot be undone. User accounts will be preserved.
+              </p>
+            </div>
+            <Button
+              onClick={handleResetSession}
+              loading={isResetting}
+              variant="danger"
+              icon={<FiAlertTriangle />}
+            >
+              Reset Session
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+      )}
 
       {/* Action Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 pt-4">
