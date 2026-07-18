@@ -22,45 +22,68 @@ export default function Dashboard() {
 
   const totalStudents = studentsDB.getAll().length;
   const todayStats = useMemo(() => attendanceService.getTodayStats(todayStr), [todayStr]);
-  const recentSessions = useMemo(() => attendanceService.getRecentSessions(8), []);
   const lowAttendance = useMemo(() => attendanceService.getLowAttendanceStudents().slice(0, 5), []);
   const summary = useMemo(() => analyticsService.getSummaryStats(), []);
 
   const branchStats = useMemo(() => {
     const students = studentsDB.getAll();
     const todayRecords = attendanceService.getByDate(todayStr);
+    const allRecords = attendanceService.getAll();
 
     const branchTotals: Record<string, number> = {};
-    students.forEach(s => {
-      if (!branchTotals[s.branch]) branchTotals[s.branch] = 0;
+    const branchPresentToday: Record<string, number> = {};
+    const branchAllRecords: Record<string, number> = {};
+    const branchAllPresent: Record<string, number> = {};
+    const rollToBranch: Record<string, string> = {};
+
+    students.forEach((s) => {
+      rollToBranch[s.rollNumber] = s.branch;
+      if (!branchTotals[s.branch]) {
+        branchTotals[s.branch] = 0;
+        branchPresentToday[s.branch] = 0;
+        branchAllRecords[s.branch] = 0;
+        branchAllPresent[s.branch] = 0;
+      }
       branchTotals[s.branch]++;
     });
 
     const uniquePresentToday = new Set<string>();
-    todayRecords.forEach(r => {
+    todayRecords.forEach((r) => {
       if (r.status === 'present' || r.status === 'late') {
         uniquePresentToday.add(r.rollNumber);
       }
     });
 
-    const branchPresent: Record<string, number> = {};
-    students.forEach(s => {
-      if (!branchPresent[s.branch]) branchPresent[s.branch] = 0;
-      if (uniquePresentToday.has(s.rollNumber)) {
-        branchPresent[s.branch]++;
+    uniquePresentToday.forEach((roll) => {
+      const branch = rollToBranch[roll];
+      if (branch) branchPresentToday[branch]++;
+    });
+
+    allRecords.forEach((r) => {
+      const branch = rollToBranch[r.rollNumber];
+      if (branch) {
+        branchAllRecords[branch]++;
+        if (r.status === 'present' || r.status === 'late') {
+          branchAllPresent[branch]++;
+        }
       }
     });
 
-    const stats = Object.keys(branchTotals).map(branch => {
-      const total = branchTotals[branch];
-      const present = branchPresent[branch] || 0;
-      const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
-      return { branch, total, present, percentage };
+    const stats = Object.keys(branchTotals).map((branch) => {
+      const totalStudents = branchTotals[branch];
+      const todayPresent = branchPresentToday[branch] || 0;
+      const todayAbsent = totalStudents - todayPresent;
+      const totalRecs = branchAllRecords[branch] || 0;
+      const totalPres = branchAllPresent[branch] || 0;
+      
+      const overallPercentage = totalRecs > 0 ? Math.round((totalPres / totalRecs) * 100) : 0;
+
+      return { branch, totalStudents, todayPresent, todayAbsent, overallPercentage };
     });
 
-    stats.sort((a, b) => b.percentage - a.percentage);
+    stats.sort((a, b) => b.overallPercentage - a.overallPercentage);
     return stats;
-  }, [todayStr, time]);
+  }, [todayStr]);
 
   return (
     <div className="space-y-6">
@@ -176,44 +199,71 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Sessions */}
+        {/* Branch Summary Grid */}
         <div className="lg:col-span-2">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-              <h3 className="text-base font-bold text-gray-800 dark:text-white">Recent Sessions</h3>
-              <span className="text-xs text-gray-400">{recentSessions.length} sessions</span>
+          <div className="flex items-center gap-2 mb-4">
+            <FiActivity className="text-indigo-600 dark:text-indigo-400" />
+            <h2 className="text-lg font-bold text-gray-800 dark:text-white">Branch Summary</h2>
+          </div>
+          {branchStats.length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm py-12 text-center">
+              <FiCheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">No branch data available</p>
             </div>
-            {recentSessions.length === 0 ? (
-              <div className="py-12 text-center">
-                <FiCalendar className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                <p className="text-sm text-gray-400">No attendance taken yet.</p>
-                <p className="text-xs text-gray-400 mt-1">Go to Attendance to mark your first session.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-50 dark:divide-gray-700">
-                {recentSessions.map((s, i) => (
-                  <motion.div
-                    key={`${s.date}-${s.subject}-${s.lectureNumber}`}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    className="px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{s.subject.replace(/\|/g, ' • ')}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        Lec {s.lectureNumber} • {s.faculty} • {formatDate(s.date)}
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {branchStats.map((b, i) => (
+                <motion.div
+                  key={b.branch}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col h-full hover:shadow-md transition-shadow"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white">{b.branch}</h3>
+                    <div className={`px-2 py-1 rounded-full text-xs font-bold ${
+                      b.overallPercentage >= 75 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                      b.overallPercentage >= 60 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                      'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    }`}>
+                      {b.overallPercentage}% Overall
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mb-5 mt-auto">
+                    <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Today's Present</p>
+                      <p className="text-base font-bold text-gray-800 dark:text-white">
+                        <span className="text-indigo-600 dark:text-indigo-400">{b.todayPresent}</span> / {b.totalStudents}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{s.count}</span>
-                      <p className="text-xs text-gray-400">students</p>
+                    <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Today's Absent</p>
+                      <p className="text-base font-bold text-gray-800 dark:text-white">{b.todayAbsent}</p>
                     </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </div>
+                  </div>
+
+                  <div className="mt-auto">
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="text-gray-500 dark:text-gray-400 font-medium">Progress</span>
+                      <span className="font-bold text-gray-700 dark:text-gray-300">{b.overallPercentage}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full ${
+                          b.overallPercentage >= 75 ? 'bg-green-500' :
+                          b.overallPercentage >= 60 ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`}
+                        style={{ width: `${b.overallPercentage}%` }}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right Column */}
@@ -246,39 +296,6 @@ export default function Dashboard() {
                       <span className="text-sm font-black text-red-500 flex-shrink-0 ml-2">{s.percentage}%</span>
                     </div>
                     <ProgressBar value={s.percentage} size="sm" />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Today's Branch Attendance */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
-            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-              <FiActivity className="text-indigo-500 w-4 h-4" />
-              <h3 className="text-base font-bold text-gray-800 dark:text-white">Today's Branch Attendance</h3>
-            </div>
-            {branchStats.length === 0 ? (
-              <div className="py-12 text-center px-4">
-                <FiCheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-400">No branch data available</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-50 dark:divide-gray-700">
-                {branchStats.map((b) => (
-                  <div key={b.branch} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{b.branch}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {b.present} / {b.total} Students
-                      </p>
-                    </div>
-                    <div className="text-right flex items-center gap-3">
-                      <div className="w-16 hidden sm:block">
-                        <ProgressBar value={b.percentage} size="sm" />
-                      </div>
-                      <span className="text-sm font-black text-indigo-600 dark:text-indigo-400 w-10 text-right">{b.percentage}%</span>
-                    </div>
                   </div>
                 ))}
               </div>
