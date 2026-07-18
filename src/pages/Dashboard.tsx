@@ -26,27 +26,26 @@ export default function Dashboard() {
   const summary = useMemo(() => analyticsService.getSummaryStats(), []);
 
   const branchStats = useMemo(() => {
-    const students = studentsDB.getAll();
-    const todayRecords = attendanceService.getByDate(todayStr);
-    const allRecords = attendanceService.getAll();
-
+    const studentStats = attendanceService.getAllStudentStats();
     const branchTotals: Record<string, number> = {};
+    const branchExpected: Record<string, number> = {};
+    const branchAttended: Record<string, number> = {};
     const branchPresentToday: Record<string, number> = {};
-    const branchAllRecords: Record<string, number> = {};
-    const branchAllPresent: Record<string, number> = {};
-    const rollToBranch: Record<string, string> = {};
 
-    students.forEach((s) => {
-      rollToBranch[s.rollNumber] = s.branch;
-      if (!branchTotals[s.branch]) {
-        branchTotals[s.branch] = 0;
-        branchPresentToday[s.branch] = 0;
-        branchAllRecords[s.branch] = 0;
-        branchAllPresent[s.branch] = 0;
+    studentStats.forEach((s) => {
+      const branch = s.student.branch;
+      if (!branchTotals[branch]) {
+        branchTotals[branch] = 0;
+        branchExpected[branch] = 0;
+        branchAttended[branch] = 0;
+        branchPresentToday[branch] = 0;
       }
-      branchTotals[s.branch]++;
+      branchTotals[branch]++;
+      branchExpected[branch] += s.total;
+      branchAttended[branch] += (s.present + s.late);
     });
 
+    const todayRecords = attendanceService.getByDate(todayStr);
     const uniquePresentToday = new Set<string>();
     todayRecords.forEach((r) => {
       if (r.status === 'present' || r.status === 'late') {
@@ -55,35 +54,26 @@ export default function Dashboard() {
     });
 
     uniquePresentToday.forEach((roll) => {
-      const branch = rollToBranch[roll];
-      if (branch) branchPresentToday[branch]++;
-    });
-
-    allRecords.forEach((r) => {
-      const branch = rollToBranch[r.rollNumber];
-      if (branch) {
-        branchAllRecords[branch]++;
-        if (r.status === 'present' || r.status === 'late') {
-          branchAllPresent[branch]++;
-        }
+      const student = studentsDB.getByRollNumber(roll);
+      if (student && branchPresentToday[student.branch] !== undefined) {
+        branchPresentToday[student.branch]++;
       }
     });
 
     const stats = Object.keys(branchTotals).map((branch) => {
       const totalStudents = branchTotals[branch];
       const todayPresent = branchPresentToday[branch] || 0;
-      const todayAbsent = totalStudents - todayPresent;
-      const totalRecs = branchAllRecords[branch] || 0;
-      const totalPres = branchAllPresent[branch] || 0;
+      const expected = branchExpected[branch] || 0;
+      const attended = branchAttended[branch] || 0;
       
-      const overallPercentage = totalRecs > 0 ? Math.round((totalPres / totalRecs) * 100) : 0;
+      const overallPercentage = expected > 0 ? Math.round((attended / expected) * 100) : 0;
 
-      return { branch, totalStudents, todayPresent, todayAbsent, overallPercentage };
+      return { branch, totalStudents, todayPresent, overallPercentage };
     });
 
     stats.sort((a, b) => b.overallPercentage - a.overallPercentage);
     return stats;
-  }, [todayStr]);
+  }, [todayStr, time]);
 
   return (
     <div className="space-y-6">
@@ -218,9 +208,9 @@ export default function Dashboard() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col h-full hover:shadow-md transition-shadow"
+                  className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col h-full hover:shadow-md transition-shadow"
                 >
-                  <div className="flex justify-between items-start mb-4">
+                  <div className="flex justify-between items-start mb-3">
                     <h3 className="text-lg font-bold text-gray-800 dark:text-white">{b.branch}</h3>
                     <div className={`px-2 py-1 rounded-full text-xs font-bold ${
                       b.overallPercentage >= 75 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
@@ -231,24 +221,23 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mb-5 mt-auto">
-                    <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                  <div className="grid grid-cols-2 gap-3 mb-4 mt-auto">
+                    <div className="bg-gray-50 dark:bg-gray-700/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-700 flex flex-col justify-center">
                       <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Today's Present</p>
-                      <p className="text-base font-bold text-gray-800 dark:text-white">
+                      <p className="text-sm font-bold text-gray-800 dark:text-white">
                         <span className="text-indigo-600 dark:text-indigo-400">{b.todayPresent}</span> / {b.totalStudents}
                       </p>
                     </div>
-                    <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Today's Absent</p>
-                      <p className="text-base font-bold text-gray-800 dark:text-white">{b.todayAbsent}</p>
+                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-2.5 rounded-xl border border-indigo-100 dark:border-indigo-800/50 flex flex-col items-center justify-center text-center">
+                      <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold mb-0.5 uppercase tracking-wide">Attendance</p>
+                      <div className="flex items-center gap-1">
+                        <FiPercent className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        <p className="text-2xl font-black text-indigo-700 dark:text-indigo-300">{b.overallPercentage}%</p>
+                      </div>
                     </div>
                   </div>
 
                   <div className="mt-auto">
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="text-gray-500 dark:text-gray-400 font-medium">Progress</span>
-                      <span className="font-bold text-gray-700 dark:text-gray-300">{b.overallPercentage}%</span>
-                    </div>
                     <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                       <div 
                         className={`h-full rounded-full ${
