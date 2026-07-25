@@ -66,7 +66,7 @@ export default function Leaves() {
           <p className="text-gray-600 dark:text-gray-400">Review and manage student leave requests.</p>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto hide-scrollbar w-full sm:w-auto">
           {['pending', 'approved', 'rejected', 'all'].map(f => (
             <button
               key={f}

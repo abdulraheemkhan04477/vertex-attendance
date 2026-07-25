@@ -45,10 +45,10 @@ export function Sidebar() {
         )}
       </AnimatePresence>
 
-      <motion.aside
-        animate={{ width: sidebarOpen ? 260 : 72 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        className="fixed left-0 top-0 h-full z-30 bg-gray-900 dark:bg-gray-950 flex flex-col overflow-hidden shadow-2xl"
+      <aside
+        className={`fixed left-0 top-0 h-full z-30 bg-gray-900 dark:bg-gray-950 flex flex-col overflow-hidden shadow-2xl transition-all duration-300 ${
+          sidebarOpen ? 'w-[260px] translate-x-0' : 'w-[260px] lg:w-[72px] -translate-x-full lg:translate-x-0'
+        }`}
       >
         {/* Header */}
         <div className="flex items-center h-16 px-4 border-b border-gray-800 flex-shrink-0">
@@ -169,7 +169,7 @@ export function Sidebar() {
             </button>
           )}
         </div>
-      </motion.aside>
+      </aside>
     </>
   );
 }

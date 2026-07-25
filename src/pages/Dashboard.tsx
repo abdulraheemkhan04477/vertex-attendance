@@ -110,7 +110,7 @@ export default function Dashboard() {
             {formatDate(todayStr)}
           </span>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard
             title="Total Students"
             value={totalStudents}
@@ -152,7 +152,7 @@ export default function Dashboard() {
           <FiActivity className="text-indigo-600 dark:text-indigo-400" />
           <h2 className="text-lg font-bold text-gray-800 dark:text-white">Semester Statistics</h2>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard
             title="Overall %"
             value={`${summary.avgPercentage}%`}

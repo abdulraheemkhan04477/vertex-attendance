@@ -132,7 +132,7 @@ export default function StudentDashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="md:col-span-2 grid grid-cols-2 gap-4"
+            className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4"
           >
             <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 p-6 flex flex-col justify-center shadow-sm">
               <div className="flex items-center gap-3 mb-2">

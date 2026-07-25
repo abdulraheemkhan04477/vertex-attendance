@@ -171,7 +171,7 @@ export const BRANCHES = [
   'CS/CSE',
   'ME/MECH',
   'CE/CIVIL',
-  'EE/EEE',
+  'EE',
   'IT',
   'Biotech',
   'CSD',

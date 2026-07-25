@@ -28,19 +28,19 @@ export function Header() {
   const title = PAGE_TITLES[location.pathname] ?? (settings?.shortName || 'App');
 
   return (
-    <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex items-center px-4 gap-4 flex-shrink-0 shadow-sm">
+    <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex items-center px-2 sm:px-4 gap-2 sm:gap-4 flex-shrink-0 shadow-sm">
       {/* Menu toggle */}
       <button
         onClick={toggleSidebar}
-        className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400 transition-colors"
+        className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400 transition-colors flex-shrink-0"
       >
         <FiMenu className="w-5 h-5" />
       </button>
 
       {/* Title */}
-      <div className="flex-1">
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h1>
-        <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
+      <div className="flex-1 min-w-0">
+        <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">{title}</h1>
+        <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block truncate">
           {formatDate(format(new Date(), 'yyyy-MM-dd'))} • {settings.semester}
         </p>
       </div>

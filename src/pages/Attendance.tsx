@@ -331,12 +331,12 @@ export default function Attendance() {
             className="w-full pl-9 pr-4 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white"
           />
         </div>
-        <div className="flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl p-1">
+        <div className="flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl p-1 overflow-x-auto w-full sm:w-auto flex-shrink-0 hide-scrollbar">
           {(['all', 'present', 'absent', 'late', 'leave'] as FilterType[]).map((f) => (
             <button
               key={f}
               onClick={() => { setFilter(f); setPage(1); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                 filter === f
                   ? 'bg-indigo-600 text-white shadow'
                   : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'

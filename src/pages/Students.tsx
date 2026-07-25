@@ -147,7 +147,7 @@ export default function Students() {
         </Button>
 
         {/* Filter */}
-        <div className="flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl p-1">
+        <div className="flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl p-1 overflow-x-auto hide-scrollbar w-full sm:w-auto">
           {[
             { id: 'all' as const, label: 'All' },
             { id: 'low' as const, label: '⚠ Low' },
@@ -240,7 +240,8 @@ export default function Students() {
       {/* List View */}
       {viewMode === 'list' && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-          <table className="w-full">
+          <div className="overflow-x-auto">
+            <table className="w-full">
             <thead>
               <tr className="bg-gray-50 dark:bg-gray-700/60 border-b border-gray-100 dark:border-gray-700">
                 {['#', 'Student', 'Roll Number', 'Attendance %', 'Status', 'Actions'].map((h) => (
@@ -301,6 +302,7 @@ export default function Students() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

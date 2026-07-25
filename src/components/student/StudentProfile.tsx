@@ -375,7 +375,7 @@ export function StudentProfile({ student, isOpen, onClose, isAdmin = false, onSa
         </div>
 
         {/* ── Stats Grid ───────────────────────────────────────── */}
-        <div className="grid grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-6">
           {[
             { label: 'Total',   value: stats.total,   icon: <FiCalendar />,    color: 'text-gray-600 dark:text-gray-400',      bg: 'bg-gray-100 dark:bg-gray-700' },
             { label: 'Present', value: stats.present, icon: <FiCheckCircle />, color: 'text-green-600 dark:text-green-400',    bg: 'bg-green-100 dark:bg-green-900/30' },

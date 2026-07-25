@@ -178,8 +178,8 @@ export default function QRAttendance() {
             Students can use the 'Scan QR' button in their portal to mark attendance. This code expires in 5 minutes.
           </p>
           
-          <div className="bg-white p-6 rounded-3xl shadow-inner inline-block mx-auto border-4 border-gray-50 dark:border-gray-900">
-            <QRCodeSVG value={qrSessionId} size={280} level="H" includeMargin={true} />
+          <div className="bg-white p-4 sm:p-6 rounded-3xl shadow-inner inline-block mx-auto border-4 border-gray-50 dark:border-gray-900 max-w-full overflow-hidden">
+            <QRCodeSVG value={qrSessionId} size={240} level="H" includeMargin={true} />
           </div>
           
           <div className="mt-8 flex items-center justify-center gap-2">

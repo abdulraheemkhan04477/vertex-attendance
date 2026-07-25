@@ -379,7 +379,17 @@ export function seedDatabase(): void {
 // ─── Users (Staff) ────────────────────────────────────────────────────────────
 export const usersDB = {
   getAll(): User[] {
-    let items = getItem<User>(KEYS.USERS);
+    let items = getItem<User>(KEYS.USERS).map(u => {
+      if (u.assignedClasses) {
+        return {
+          ...u,
+          assignedClasses: u.assignedClasses.map(c => 
+            (c.branch === 'EE/EEE' || c.branch === 'EEE') ? { ...c, branch: 'EE' } : c
+          )
+        };
+      }
+      return u;
+    });
     return items;
   },
 
@@ -444,8 +454,13 @@ export const usersDB = {
 // ─── Students ─────────────────────────────────────────────────────────────────
 export const studentsDB = {
   getAll(): Student[] {
-    let items = getItem<Student>(KEYS.STUDENTS);
-    
+    let items = getItem<Student>(KEYS.STUDENTS).map(s => {
+      if (s.branch === 'EE/EEE' || s.branch === 'EEE') {
+        return { ...s, branch: 'EE' };
+      }
+      return s;
+    });
+
     // Backend-level enforcement of HOD and Teacher filtering
     const token = authDB.getToken();
     if (token) {
@@ -767,7 +782,12 @@ export const sessionsDB = {
 // ─── QR Sessions ──────────────────────────────────────────────────────────────
 export const qrSessionsDB = {
   getAll(): import('../types').QrSession[] {
-    let items = getItem<import('../types').QrSession>(KEYS.QR_SESSIONS);
+    let items = getItem<import('../types').QrSession>(KEYS.QR_SESSIONS).map(s => {
+      if (s.branch === 'EE/EEE' || s.branch === 'EEE') {
+        return { ...s, branch: 'EE' };
+      }
+      return s;
+    });
     return items;
   },
 
