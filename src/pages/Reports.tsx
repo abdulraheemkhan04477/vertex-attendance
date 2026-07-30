@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { FiFilter } from 'react-icons/fi';
 import { attendanceService } from '../services/attendanceService';
 import { studentsDB } from '../services/db';
-import { exportSummaryToCSV, exportSummaryToExcel, exportSummaryToPDF, printSummary } from '../services/exportService';
+import { exportSummaryToCSV, exportSummaryToExcel, exportSummaryToPDF, printSummary, type ReportContext } from '../services/exportService';
 import { formatDate, today, getMonthRange } from '../utils/dateUtils';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { useToast } from '../hooks/useToast';
@@ -15,7 +15,7 @@ type ReportType = 'daily' | 'weekly' | 'monthly' | 'semester';
 
 export default function Reports() {
   const toast = useToast();
-  const { currentUser } = useStore();
+  const { currentUser, settings } = useStore();
   const todayStr = today();
   const [activeReport, setActiveReport] = useState<ReportType>('daily');
   const [customDate, setCustomDate] = useState(todayStr);
@@ -74,6 +74,10 @@ export default function Reports() {
     
     return stats.sort((a, b) => {
       if (sortBy === 'percentage') {
+        if (a.percentage === b.percentage) {
+          // Fallback to natural roll number sort (always ascending)
+          return a.student.rollNumber.localeCompare(b.student.rollNumber, undefined, { numeric: true });
+        }
         return sortOrder === 'asc' ? a.percentage - b.percentage : b.percentage - a.percentage;
       } else {
         return sortOrder === 'asc' 
@@ -107,11 +111,28 @@ export default function Reports() {
     const title = getTitle();
     const filename = getFilename();
 
+    // Build report context — shown once at the top of the report
+    const ctx: ReportContext = {
+      branch:      filterBranch   || undefined,
+      year:        filterYear     || undefined,
+      semester:    filterSemester || undefined,
+      section:     filterSection  || undefined,
+      date:        activeReport === 'daily'
+                     ? customDate
+                     : activeReport === 'monthly'
+                       ? customMonth
+                       : undefined,
+      // Header fields
+      courseName:   settings.department || 'B.Tech',
+      academicYear: settings.semester   || '',
+      facultyName:  currentUser?.name   || settings.facultyName || '',
+    };
+
     try {
       if (type === 'csv') exportSummaryToCSV(reportStats, filename);
       else if (type === 'excel') exportSummaryToExcel(reportStats, filename);
-      else if (type === 'pdf') await exportSummaryToPDF(reportStats, title);
-      else if (type === 'print') printSummary(reportStats, title);
+      else if (type === 'pdf') await exportSummaryToPDF(reportStats, title, ctx);
+      else if (type === 'print') printSummary(reportStats, title, ctx);
       toast.success('Report generated successfully!');
     } catch {
       toast.error('Failed to generate report');

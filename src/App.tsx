@@ -28,7 +28,7 @@ import { useAuth } from './hooks/useAuth';
 // Protected route wrapper
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
   const { isAuthenticated, currentUser } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/student-login" replace />;
   
   if (allowedRoles && currentUser) {
     if (!allowedRoles.includes(currentUser.role)) {
@@ -94,8 +94,8 @@ export default function App() {
         </Route>
 
         {/* Default redirect */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<Navigate to="/student-login" replace />} />
+        <Route path="*" element={<Navigate to="/student-login" replace />} />
       </Routes>
     </BrowserRouter>
   );

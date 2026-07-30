@@ -14,6 +14,7 @@ import { today } from '../utils/dateUtils';
 import type { Student, AttendanceStatus } from '../types';
 import { YEARS, BRANCHES, SEMESTERS_BY_YEAR } from '../types';
 import { useStore } from '../store/useStore';
+import { normalizeDepartment } from '../utils/departmentUtils';
 
 const PAGE_SIZE = 20;
 
@@ -185,7 +186,8 @@ export default function Attendance() {
       list = list.filter(s => s.year === year);
     }
     if (branch) {
-      list = list.filter(s => s.branch === branch);
+      const normalizedBranch = normalizeDepartment(branch);
+      list = list.filter(s => normalizeDepartment(s.branch) === normalizedBranch);
     }
     
     if (search.trim()) {
