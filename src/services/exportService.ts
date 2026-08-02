@@ -401,7 +401,11 @@ export function printSummary(
   const settings = settingsDB.get();
   const sorted = stats;
 
-  const pctColor = (pct: number) => (pct < 75 ? '#dc2626' : '#059669');
+  const fmtPct = (pct: number) => {
+    if (Number.isInteger(pct)) return `${pct}%`;
+    return `${pct.toFixed(1)}%`;
+  };
+  const pctColor = (pct: number) => (pct < 75 ? '#dc2626' : '#16a34a');
 
   const rows = sorted
     .map(
@@ -409,11 +413,10 @@ export function printSummary(
         `<tr>
           <td class="c">${i + 1}</td>
           <td class="c mono">${s.student.rollNumber}</td>
-          <td>${s.student.name}</td>
+          <td class="name">${s.student.name}</td>
           <td class="c">${s.total}</td>
           <td class="c grn">${s.present}</td>
-          <td class="c red">${s.absent}</td>
-          <td class="c" style="color:${pctColor(s.percentage)};font-weight:700">${s.percentage}%</td>
+          <td class="c pct" style="color:${pctColor(s.percentage)}">${fmtPct(s.percentage)}</td>
         </tr>`,
     )
     .join('');
@@ -434,118 +437,241 @@ export function printSummary(
 <head>
   <meta charset="UTF-8"/>
   <title>${title}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    @page { size: A4 portrait; margin: 12mm 14mm 12mm 14mm; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    @page {
+      size: A4 portrait;
+      margin: 10mm 10mm 10mm 10mm;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Inter', Arial, Helvetica, sans-serif;
       background: #fff;
-      color: #111827;
-      font-size: 10.5px;
+      color: #1f2937;
+      font-size: 10px;
+      line-height: 1.45;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
 
     /* ── Header ── */
-    .hdr        { text-align: center; margin-bottom: 4px; }
-    .hdr img    { height: 44px; object-fit: contain; display: block; margin: 0 auto 3px; }
-    .h-course   { font-size: 13px; font-weight: 800; color: #111827; line-height: 1.2; }
-    .h-acyear   { font-size: 9px;  font-weight: 600; color: #3b3b6d; margin-top: 1px; }
-    .h-title    { font-size: 10px; font-weight: 700; color: #4f46e5; margin-top: 2px; }
+    .hdr {
+      text-align: center;
+      padding-bottom: 2px;
+    }
+    .hdr img {
+      height: 32px;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 2px;
+    }
+    .h-institute {
+      font-size: 13px;
+      font-weight: 800;
+      color: #111827;
+      letter-spacing: 0.3px;
+      line-height: 1.2;
+    }
+    .h-course {
+      font-size: 9.5px;
+      font-weight: 600;
+      color: #4b5563;
+      margin-top: 1px;
+    }
+    .h-acyear {
+      font-size: 8.5px;
+      font-weight: 500;
+      color: #6b7280;
+      margin-top: 1px;
+    }
+    .h-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #4f46e5;
+      margin-top: 3px;
+      letter-spacing: 0.2px;
+    }
 
     /* ── Dividers ── */
-    .div-top { border: none; border-top: 2px solid #4f46e5; margin: 4px 0 4px; }
-    .div-bot { border: none; border-top: 1px solid #d1d5db; margin: 4px 0 3px; }
+    .rule-thick {
+      border: none;
+      border-top: 2px solid #4f46e5;
+      margin: 4px 0;
+    }
+    .rule-thin {
+      border: none;
+      border-top: 1px solid #e5e7eb;
+      margin: 3px 0;
+    }
 
-    /* ── Academic info grid (2 rows × 2 cols) ── */
-    .acad-grid { width: 100%; border-collapse: collapse; margin-bottom: 2px; }
-    .acad-grid td { padding: 1.5px 4px; font-size: 9.5px; vertical-align: middle; width: 25%; }
-    .al { font-weight: 700; color: #4f46e5; white-space: nowrap; }
-    .al::after { content: ':'; }
-    .av { color: #111827; }
+    /* ── Meta info grid ── */
+    .meta-grid {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 2px;
+    }
+    .meta-grid td {
+      padding: 2px 4px;
+      font-size: 9px;
+      vertical-align: middle;
+      width: 25%;
+    }
+    .ml {
+      font-weight: 700;
+      color: #4f46e5;
+      white-space: nowrap;
+    }
+    .ml::after { content: ':'; margin-right: 4px; }
+    .mv { color: #1f2937; font-weight: 500; }
 
     /* ── Faculty row ── */
-    .fac-row { font-size: 9.5px; margin-bottom: 2px; }
-    .fac-row .al { font-weight: 700; color: #4f46e5; }
-    .fac-row .al::after { content: ':'; }
-
-    /* ── Printed on ── */
-    .pon { font-size: 8.5px; color: #9ca3af; text-align: right; margin-bottom: 3px; font-style: italic; }
-
-    /* ── Student table ── */
-    table.stbl { width: 100%; border-collapse: collapse; font-size: 9.5px; }
-    table.stbl thead tr { background: #4f46e5; color: #fff; }
-    table.stbl thead th {
-      padding: 4px 5px; font-weight: 700; font-size: 9px;
-      border: 1px solid #3730a3; text-align: center;
+    .fac-row {
+      font-size: 9px;
+      padding: 2px 4px;
     }
-    table.stbl thead th.tl { text-align: left; }
-    table.stbl tbody tr:nth-child(even) { background: #f5f7ff; }
-    table.stbl tbody tr:nth-child(odd)  { background: #ffffff; }
-    table.stbl tbody td { padding: 3px 5px; border: 1px solid #e5e7eb; }
+    .fac-row .ml { font-weight: 700; color: #4f46e5; }
+    .fac-row .ml::after { content: ':'; margin-right: 4px; }
+
+    /* ── Printed On ── */
+    .printed-on {
+      font-size: 8px;
+      color: #9ca3af;
+      text-align: right;
+      font-style: italic;
+      padding: 2px 4px;
+    }
+
+    /* ── Student summary ── */
+    .summary-bar {
+      font-size: 8.5px;
+      color: #6b7280;
+      padding: 2px 4px;
+      font-weight: 500;
+    }
+
+    /* ── Data Table ── */
+    table.data-tbl {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+      page-break-inside: auto;
+    }
+    table.data-tbl thead {
+      display: table-header-group;
+    }
+    table.data-tbl tbody {
+      display: table-row-group;
+    }
+    table.data-tbl tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
+    }
+    table.data-tbl thead tr {
+      background: #4f46e5;
+      color: #fff;
+    }
+    table.data-tbl thead th {
+      padding: 7px 6px;
+      font-weight: 700;
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      border: 1px solid #4338ca;
+      text-align: center;
+      white-space: nowrap;
+    }
+    table.data-tbl thead th.tl { text-align: left; }
+    table.data-tbl tbody tr:nth-child(even) { background: #f8f9ff; }
+    table.data-tbl tbody tr:nth-child(odd)  { background: #ffffff; }
+    table.data-tbl tbody tr:hover { background: #eef0ff; }
+    table.data-tbl tbody td {
+      padding: 6px 6px;
+      border: 1px solid #e5e7eb;
+      vertical-align: middle;
+    }
+
+    /* ── Cell utilities ── */
     td.c    { text-align: center; }
-    td.mono { font-family: 'Courier New', monospace; font-weight: 600; }
-    td.grn  { color: #059669; font-weight: 600; }
-    td.red  { color: #dc2626; font-weight: 600; }
+    td.name { font-weight: 500; font-size: 10px; }
+    td.mono { font-family: 'Courier New', Consolas, monospace; font-weight: 600; font-size: 9.5px; }
+    td.grn  { color: #16a34a; font-weight: 600; }
+    td.pct  { font-weight: 700; font-size: 10.5px; }
+
 
     /* ── Watermark ── */
     .wm {
-      position: fixed; top: 50%; left: 50%;
-      transform: translate(-50%,-50%);
-      opacity: 0.05; z-index: -1;
-      width: 50%; max-width: 360px; pointer-events: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.04;
+      z-index: -1;
+      width: 45%;
+      max-width: 320px;
+      pointer-events: none;
     }
 
     /* ── Footer ── */
-    .ftr { margin-top: 6px; text-align: center; font-size: 8.5px; color: #9ca3af; }
+    .ftr {
+      margin-top: 10px;
+      text-align: center;
+      font-size: 7.5px;
+      color: #9ca3af;
+      border-top: 1px solid #f3f4f6;
+      padding-top: 4px;
+    }
 
-    @media print { .no-print { display: none !important; } }
+    @media print {
+      .no-print { display: none !important; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
   </style>
 </head>
 <body>
   ${settings.logoUrl ? `<img src="${settings.logoUrl}" class="wm">` : ''}
 
-  <!-- 1. Header -->
+  <!-- Header -->
   <div class="hdr">
     ${settings.logoUrl ? `<img src="${settings.logoUrl}">` : ''}
+    <div class="h-institute">${settings.instituteName || ''}</div>
     <div class="h-course">${courseName}</div>
     ${academicYear ? `<div class="h-acyear">${academicYear}</div>` : ''}
     <div class="h-title">${title}</div>
   </div>
 
-  <!-- Top rule -->
-  <hr class="div-top">
+  <hr class="rule-thick">
 
-  <!-- 5. Academic Information — Year/Semester | Branch/Section -->
-  <table class="acad-grid">
+  <!-- Academic Information -->
+  <table class="meta-grid">
     <tr>
-      <td class="al">Year</td><td class="av">${ctx.year || '—'}</td>
-      <td class="al">Semester</td><td class="av">${ctx.semester || '—'}</td>
+      <td class="ml">Year</td><td class="mv">${ctx.year || '—'}</td>
+      <td class="ml">Semester</td><td class="mv">${ctx.semester || '—'}</td>
     </tr>
     <tr>
-      <td class="al">Branch</td><td class="av">${ctx.branch || '—'}</td>
-      <td class="al">Section</td><td class="av">${ctx.section || '—'}</td>
+      <td class="ml">Branch</td><td class="mv">${ctx.branch || '—'}</td>
+      <td class="ml">Section</td><td class="mv">${ctx.section || '—'}</td>
     </tr>
   </table>
 
-  <!-- 6. Faculty Name -->
-  ${facultyName ? `<div class="fac-row"><span class="al">Faculty Name</span>&nbsp;<span class="av">${facultyName}</span></div>` : ''}
+  ${facultyName ? `<div class="fac-row"><span class="ml">Faculty Name</span><span class="mv">${facultyName}</span></div>` : ''}
 
-  <!-- 7. Printed On -->
-  <div class="pon">Printed On: ${printedOn}</div>
+  <div class="printed-on">Printed On: ${printedOn}</div>
 
-  <!-- Bottom rule -->
-  <hr class="div-bot">
+  <hr class="rule-thin">
 
-  <!-- Student Table -->
-  <table class="stbl">
+  <div class="summary-bar">Total Students: ${sorted.length}</div>
+
+  <!-- Data Table -->
+  <table class="data-tbl">
     <thead>
       <tr>
-        <th style="width:32px">S.No.</th>
-        <th style="width:90px">Roll Number</th>
+        <th style="width:6%">S. No.</th>
+        <th style="width:16%">Roll Number</th>
         <th class="tl">Student Name</th>
-        <th style="width:80px">Total Working Days</th>
-        <th style="width:55px">Present</th>
-        <th style="width:55px">Absent</th>
-        <th style="width:72px">Attendance %</th>
+        <th style="width:14%">Total Days</th>
+        <th style="width:12%">Present</th>
+        <th style="width:16%">Attendance (%)</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>

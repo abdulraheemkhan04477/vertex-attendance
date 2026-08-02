@@ -65,6 +65,20 @@ export default function Attendance() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
 
+  // Students filtered by selected year + branch (the "working set" for attendance).
+  // This is separate from the display-level `filtered` which also applies search/status filters.
+  const branchFilteredStudents = useMemo(() => {
+    let list = allStudents;
+    if (year) {
+      list = list.filter(s => s.year === year);
+    }
+    if (branch) {
+      const normalizedBranch = normalizeDepartment(branch);
+      list = list.filter(s => normalizeDepartment(s.branch) === normalizedBranch);
+    }
+    return list;
+  }, [allStudents, year, branch]);
+
   // Load existing session data when session params change
   useEffect(() => {
     if (!fullSubject) {
@@ -75,7 +89,7 @@ export default function Attendance() {
     const existing = attendanceService.getBySession(date, fullSubject, lectureNumber);
     const sMap: Record<string, AttendanceStatus | null> = {};
     const rMap: Record<string, string> = {};
-    allStudents.forEach((s) => {
+    branchFilteredStudents.forEach((s) => {
       const rec = existing.find((r) => r.rollNumber === s.rollNumber);
       sMap[s.rollNumber] = rec ? rec.status : null;
       rMap[s.rollNumber] = rec ? rec.remarks : '';
@@ -84,7 +98,7 @@ export default function Attendance() {
     setRemarkMap(rMap);
     undoStack.current = [];
     redoStack.current = [];
-  }, [date, fullSubject, lectureNumber, allStudents]);
+  }, [date, fullSubject, lectureNumber, branchFilteredStudents]);
 
   const pushUndo = useCallback((prev: Record<string, AttendanceStatus | null>) => {
     undoStack.current = [...undoStack.current.slice(-19), prev];
@@ -120,28 +134,28 @@ export default function Attendance() {
     setStatusMap((prev) => {
       pushUndo(prev);
       const next = { ...prev };
-      allStudents.forEach((s) => { next[s.rollNumber] = status; });
+      branchFilteredStudents.forEach((s) => { next[s.rollNumber] = status; });
       return next;
     });
     toast.info(`All students marked as ${status}`);
-  }, [allStudents, pushUndo, toast]);
+  }, [branchFilteredStudents, pushUndo, toast]);
 
   const reset = useCallback(() => {
     setStatusMap((prev) => {
       pushUndo(prev);
       const next: Record<string, AttendanceStatus | null> = {};
-      allStudents.forEach((s) => { next[s.rollNumber] = null; });
+      branchFilteredStudents.forEach((s) => { next[s.rollNumber] = null; });
       return next;
     });
     toast.info('Attendance reset');
-  }, [allStudents, pushUndo, toast]);
+  }, [branchFilteredStudents, pushUndo, toast]);
 
   const handleSave = useCallback(async () => {
     if (!fullSubject) { toast.error('Please select Year, Branch, and Semester'); return; }
     
     const faculty = currentUser?.name || settings.facultyName || 'Default Faculty';
     
-    const records = allStudents
+    const records = branchFilteredStudents
       .filter((s) => statusMap[s.rollNumber])
       .map((s) => ({
         studentId: s.id,
@@ -154,7 +168,7 @@ export default function Attendance() {
         status: statusMap[s.rollNumber]!,
         remarks: remarkMap[s.rollNumber] || '',
         year,
-        branch,
+        branch: s.branch,
         semesterNum: semester
       }));
     if (records.length === 0) { toast.warning('Please mark at least one student'); return; }
@@ -162,7 +176,7 @@ export default function Attendance() {
     attendanceService.saveSession(records);
     setSaving(false);
     toast.success(`✅ Attendance saved for ${records.length} students!`);
-  }, [fullSubject, year, branch, semester, settings.facultyName, date, lectureNumber, allStudents, statusMap, remarkMap, toast]);
+  }, [fullSubject, year, branch, semester, settings.facultyName, date, lectureNumber, branchFilteredStudents, statusMap, remarkMap, toast, currentUser]);
 
 
   // Keyboard shortcuts
@@ -178,17 +192,9 @@ export default function Attendance() {
   }, [handleSave, handleUndo, handleRedo]);
 
   // Filtered + searched + paginated students
+  // Starts from branchFilteredStudents (already year+branch filtered) then applies search/status
   const filtered = useMemo(() => {
-    let list = allStudents;
-    
-    // Auto-filter students by selected year and branch if provided
-    if (year) {
-      list = list.filter(s => s.year === year);
-    }
-    if (branch) {
-      const normalizedBranch = normalizeDepartment(branch);
-      list = list.filter(s => normalizeDepartment(s.branch) === normalizedBranch);
-    }
+    let list = branchFilteredStudents;
     
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -198,7 +204,7 @@ export default function Attendance() {
       list = list.filter((s) => statusMap[s.rollNumber] === filter);
     }
     return list;
-  }, [allStudents, search, filter, statusMap, year, branch]);
+  }, [branchFilteredStudents, search, filter, statusMap]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
