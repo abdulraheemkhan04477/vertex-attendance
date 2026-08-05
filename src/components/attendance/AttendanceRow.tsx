@@ -8,6 +8,7 @@ interface AttendanceRowProps {
   onStatusChange: (rollNumber: string, status: AttendanceStatus) => void;
   onRemarkChange: (rollNumber: string, remark: string) => void;
   onStudentClick: (student: Student) => void;
+  readOnly?: boolean;
 }
 
 const STATUS_BTNS: { status: AttendanceStatus; label: string; activeClass: string; hoverClass: string }[] = [
@@ -25,7 +26,7 @@ const ROW_STATUS_BG: Record<string, string> = {
 };
 
 export function AttendanceRow({
-  student, index, status, remark, onStatusChange, onRemarkChange, onStudentClick,
+  student, index, status, remark, onStatusChange, onRemarkChange, onStudentClick, readOnly
 }: AttendanceRowProps) {
   return (
     <tr className={`border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50/80 dark:hover:bg-gray-800/60 transition-colors ${status ? ROW_STATUS_BG[status] : ''}`}>
@@ -76,11 +77,12 @@ export function AttendanceRow({
             <button
               key={s}
               onClick={() => onStatusChange(student.rollNumber, s)}
+              disabled={readOnly}
               className={`w-8 h-8 rounded-lg text-xs font-bold border transition-all duration-150
                 ${status === s
                   ? activeClass
-                  : `border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 ${hoverClass}`
-                }
+                  : `border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 ${readOnly ? '' : hoverClass}`
+                } ${readOnly ? 'opacity-60 cursor-not-allowed' : ''}
               `}
               title={s.charAt(0).toUpperCase() + s.slice(1)}
             >
@@ -95,8 +97,9 @@ export function AttendanceRow({
           type="text"
           value={remark}
           onChange={(e) => onRemarkChange(student.rollNumber, e.target.value)}
+          disabled={readOnly}
           placeholder="Add remark..."
-          className="w-full text-xs px-2 py-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-700 dark:text-gray-300 placeholder-gray-400 min-w-[120px]"
+          className="w-full text-xs px-2 py-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-700 dark:text-gray-300 placeholder-gray-400 min-w-[120px] disabled:opacity-60 disabled:cursor-not-allowed"
         />
       </td>
     </tr>

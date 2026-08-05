@@ -186,15 +186,37 @@ export async function syncFromCloud(): Promise<void> {
   if (!isSupabaseConfigured || !supabase) return;
   try {
     let baseStudents: Student[] = [];
-    const { data: studentRows, error: se } = await supabase.from('students').select('*');
-    if (!se && studentRows && studentRows.length > 0) {
-      baseStudents = studentRows.map(rowToStudent);
+    let hasMoreStudents = true;
+    let pageStudents = 0;
+    while (hasMoreStudents) {
+      const { data: studentRows, error: se } = await supabase.from('students')
+        .select('*')
+        .range(pageStudents * 1000, (pageStudents + 1) * 1000 - 1);
+      if (se) break;
+      if (studentRows && studentRows.length > 0) {
+        baseStudents.push(...studentRows.map(rowToStudent));
+        if (studentRows.length < 1000) hasMoreStudents = false;
+        else pageStudents++;
+      } else {
+        hasMoreStudents = false;
+      }
     }
 
     let baseAttendance: AttendanceRecord[] = [];
-    const { data: attRows, error: ae } = await supabase.from('attendance_records').select('*');
-    if (!ae && attRows) {
-      baseAttendance = attRows.map(rowToAttendance);
+    let hasMoreAttendance = true;
+    let pageAttendance = 0;
+    while (hasMoreAttendance) {
+      const { data: attRows, error: ae } = await supabase.from('attendance_records')
+        .select('*')
+        .range(pageAttendance * 1000, (pageAttendance + 1) * 1000 - 1);
+      if (ae) break;
+      if (attRows && attRows.length > 0) {
+        baseAttendance.push(...attRows.map(rowToAttendance));
+        if (attRows.length < 1000) hasMoreAttendance = false;
+        else pageAttendance++;
+      } else {
+        hasMoreAttendance = false;
+      }
     }
 
     const { data: settingsRows, error: ste } = await supabase.from('app_settings').select('*');

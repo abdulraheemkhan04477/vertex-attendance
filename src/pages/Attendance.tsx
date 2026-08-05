@@ -64,6 +64,9 @@ export default function Attendance() {
   const [saving, setSaving] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
+  const isPreviousDate = date < today();
+  const canEdit = !isPreviousDate || currentUser?.role === 'superadmin' || currentUser?.role === 'college_admin';
+
 
   // Students filtered by selected year + branch (the "working set" for attendance).
   // This is separate from the display-level `filtered` which also applies search/status filters.
@@ -131,6 +134,7 @@ export default function Attendance() {
   }, [statusMap, toast]);
 
   const markAll = useCallback((status: AttendanceStatus) => {
+    if (!canEdit) return;
     setStatusMap((prev) => {
       pushUndo(prev);
       const next = { ...prev };
@@ -138,9 +142,10 @@ export default function Attendance() {
       return next;
     });
     toast.info(`All students marked as ${status}`);
-  }, [branchFilteredStudents, pushUndo, toast]);
+  }, [branchFilteredStudents, pushUndo, toast, canEdit]);
 
   const reset = useCallback(() => {
+    if (!canEdit) return;
     setStatusMap((prev) => {
       pushUndo(prev);
       const next: Record<string, AttendanceStatus | null> = {};
@@ -148,9 +153,10 @@ export default function Attendance() {
       return next;
     });
     toast.info('Attendance reset');
-  }, [branchFilteredStudents, pushUndo, toast]);
+  }, [branchFilteredStudents, pushUndo, toast, canEdit]);
 
   const handleSave = useCallback(async () => {
+    if (!canEdit) return;
     if (!fullSubject) { toast.error('Please select Year, Branch, and Semester'); return; }
     
     const faculty = currentUser?.name || settings.facultyName || 'Default Faculty';
@@ -176,20 +182,20 @@ export default function Attendance() {
     attendanceService.saveSession(records);
     setSaving(false);
     toast.success(`✅ Attendance saved for ${records.length} students!`);
-  }, [fullSubject, year, branch, semester, settings.facultyName, date, lectureNumber, branchFilteredStudents, statusMap, remarkMap, toast, currentUser]);
+  }, [fullSubject, year, branch, semester, settings.facultyName, date, lectureNumber, branchFilteredStudents, statusMap, remarkMap, toast, currentUser, canEdit]);
 
 
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 's') { e.preventDefault(); handleSave(); }
+      if (e.ctrlKey && e.key === 's') { e.preventDefault(); if (canEdit) handleSave(); }
       if (e.ctrlKey && e.key === 'p') { e.preventDefault(); window.print(); }
-      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); handleUndo(); }
-      if (e.ctrlKey && e.key === 'y') { e.preventDefault(); handleRedo(); }
+      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); if (canEdit) handleUndo(); }
+      if (e.ctrlKey && e.key === 'y') { e.preventDefault(); if (canEdit) handleRedo(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSave, handleUndo, handleRedo]);
+  }, [handleSave, handleUndo, handleRedo, canEdit]);
 
   // Filtered + searched + paginated students
   // Starts from branchFilteredStudents (already year+branch filtered) then applies search/status
@@ -292,9 +298,13 @@ export default function Attendance() {
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4">
         <div className="flex flex-wrap items-center gap-3">
           {/* Bulk actions */}
-          <Button onClick={() => markAll('present')} variant="success"  size="sm" icon={<FiCheckCircle />}>Mark All Present</Button>
-          <Button onClick={() => markAll('absent')}  variant="danger"   size="sm" icon={<FiXCircle />}>Mark All Absent</Button>
-          <Button onClick={reset}                     variant="secondary" size="sm" icon={<FiRefreshCw />}>Reset</Button>
+          {canEdit && (
+            <>
+              <Button onClick={() => markAll('present')} variant="success"  size="sm" icon={<FiCheckCircle />}>Mark All Present</Button>
+              <Button onClick={() => markAll('absent')}  variant="danger"   size="sm" icon={<FiXCircle />}>Mark All Absent</Button>
+              <Button onClick={reset}                     variant="secondary" size="sm" icon={<FiRefreshCw />}>Reset</Button>
+            </>
+          )}
 
           <div className="flex-1" />
 
@@ -304,9 +314,11 @@ export default function Attendance() {
           <Button onClick={() => exportToPDF(currentRecords, `Attendance ${date} - ${semester}`)} variant="outline" size="sm" icon={<FiDownload />}>PDF</Button>
 
           {/* Save */}
-          <Button onClick={handleSave} loading={saving} variant="primary" size="sm" icon={<FiSave />}>
-            Save (Ctrl+S)
-          </Button>
+          {canEdit && (
+            <Button onClick={handleSave} loading={saving} variant="primary" size="sm" icon={<FiSave />}>
+              Save (Ctrl+S)
+            </Button>
+          )}
         </div>
 
         {/* Mini stats */}
@@ -397,6 +409,7 @@ export default function Attendance() {
                   onStatusChange={handleStatusChange}
                   onRemarkChange={handleRemarkChange}
                   onStudentClick={setSelectedStudent}
+                  readOnly={!canEdit}
                 />
               ))}
             </tbody>
