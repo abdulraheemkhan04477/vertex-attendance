@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard';
 import Attendance from './pages/Attendance';
 import History from './pages/History';
 import QRAttendance from './pages/QRAttendance';
+import Biometric from './pages/Biometric';
 import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
 import Students from './pages/Students';
@@ -23,6 +24,8 @@ import StudentDashboard from './pages/student-portal/StudentDashboard';
 import OwnerLogin from './pages/OwnerLogin';
 import Leaves from './pages/Leaves';
 import LeaveApply from './pages/student-portal/LeaveApply';
+import Fees from './pages/Fees';
+import StudentFees from './pages/student-portal/StudentFees';
 import { useAuth } from './hooks/useAuth';
 
 // Protected route wrapper
@@ -77,9 +80,11 @@ export default function App() {
         <Route path="/dashboard"  element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/attendance" element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod', 'teacher']}><Attendance /></ProtectedRoute>} />
         <Route path="/qr-attendance" element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod', 'teacher']}><QRAttendance /></ProtectedRoute>} />
+        <Route path="/biometric" element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod', 'teacher']}><Biometric /></ProtectedRoute>} />
         <Route path="/history"    element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod', 'teacher']}><History /></ProtectedRoute>} />
-        <Route path="/analytics"  element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Analytics /></ProtectedRoute>} />
-        <Route path="/reports"    element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Reports /></ProtectedRoute>} />
+        <Route path="/fees"       element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod', 'teacher']}><Fees /></ProtectedRoute>} />
+        <Route path="/analytics"  element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod', 'teacher']}><Analytics /></ProtectedRoute>} />
+        <Route path="/reports"    element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod', 'teacher']}><Reports /></ProtectedRoute>} />
         <Route path="/students"   element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Students /></ProtectedRoute>} />
         <Route path="/staff"      element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Staff /></ProtectedRoute>} />
         <Route path="/settings"   element={<ProtectedRoute allowedRoles={['superadmin', 'college_admin', 'hod']}><Settings /></ProtectedRoute>} />
@@ -90,6 +95,7 @@ export default function App() {
         <Route path="/student" element={<StudentProtectedRoute />}>
           <Route path="dashboard" element={<StudentDashboard />} />
           <Route path="leaves" element={<LeaveApply />} />
+          <Route path="fees" element={<StudentFees />} />
           <Route index element={<Navigate to="/student/dashboard" replace />} />
         </Route>
 

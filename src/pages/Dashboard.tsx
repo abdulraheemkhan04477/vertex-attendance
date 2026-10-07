@@ -14,16 +14,24 @@ export default function Dashboard() {
   const { settings } = useStore();
   const todayStr = today();
   const [time, setTime] = useState(new Date());
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(t);
+    const handleStorage = () => setRefreshTrigger((prev) => prev + 1);
+    window.addEventListener('local-storage', handleStorage);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('local-storage', handleStorage);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   const totalStudents = studentsDB.getAll().length;
-  const todayStats = useMemo(() => attendanceService.getTodayStats(todayStr), [todayStr]);
-  const lowAttendance = useMemo(() => attendanceService.getLowAttendanceStudents().slice(0, 5), []);
-  const summary = useMemo(() => analyticsService.getSummaryStats(), []);
+  const todayStats = useMemo(() => attendanceService.getTodayStats(todayStr), [todayStr, refreshTrigger]);
+  const lowAttendance = useMemo(() => attendanceService.getLowAttendanceStudents().slice(0, 5), [refreshTrigger]);
+  const summary = useMemo(() => analyticsService.getSummaryStats(), [refreshTrigger]);
 
   const branchStats = useMemo(() => {
     const studentStats = attendanceService.getAllStudentStats();
@@ -73,7 +81,7 @@ export default function Dashboard() {
 
     stats.sort((a, b) => b.overallPercentage - a.overallPercentage);
     return stats;
-  }, [todayStr, time]);
+  }, [todayStr, time, refreshTrigger]);
 
   return (
     <div className="space-y-6">

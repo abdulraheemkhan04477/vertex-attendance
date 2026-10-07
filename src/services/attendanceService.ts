@@ -1,7 +1,8 @@
-import { attendanceDB, studentsDB } from './db';
+import { attendanceDB, studentsDB, faceEnrollmentDB, generateId } from './db';
 import { useStore } from '../store/useStore';
 import { isSameDepartment } from '../utils/departmentUtils';
-import type { AttendanceRecord, AttendanceStats, StudentAttendanceStats } from '../types';
+import { today } from '../utils/dateUtils';
+import type { AttendanceRecord, AttendanceStats, StudentAttendanceStats, Student } from '../types';
 
 function getFilteredRecords(records: AttendanceRecord[]): AttendanceRecord[] {
   const currentUser = useStore.getState().currentUser;
@@ -196,4 +197,140 @@ export const attendanceService = {
       return { ...s, count: records.length };
     });
   },
+
+  /**
+   * Get actual attendance status for a student for today.
+   * Returns: { status: 'present' | 'absent' | 'late' | 'leave' | 'not_marked', record: AttendanceRecord | null }
+   */
+  getTodayAttendanceStatus(rollNumber: string): {
+    status: 'present' | 'absent' | 'late' | 'leave' | 'not_marked';
+    record: AttendanceRecord | null;
+  } {
+    const todayStr = today();
+    const studentRecords = attendanceDB.getByStudent(rollNumber);
+    const todayRecord = studentRecords.find((r) => r.date === todayStr);
+
+    if (!todayRecord) {
+      return { status: 'not_marked', record: null };
+    }
+
+    return { status: todayRecord.status, record: todayRecord };
+  },
+
+  /**
+   * Mark / Update face attendance for student after verification & liveness check.
+   * ABSENT -> PRESENT Update: If today's record exists as Absent (or late/leave), update it to Present.
+   * If already Present: Returns existing record.
+   * If no record exists for today: Creates new record with status Present.
+   */
+  markFaceAttendance(student: Student): AttendanceRecord {
+    console.log(`[Face Attendance] Starting attendance process for student: ${student.name} (${student.rollNumber})`);
+
+    // 1. Backend Enrollment Status Verification (Req 10)
+    const enrollment = faceEnrollmentDB.getByRollNumber(student.rollNumber);
+    if (!enrollment || enrollment.status !== 'approved') {
+      console.warn(
+        `[Face Attendance] Blocked: Student ${student.rollNumber} face enrollment status is ${
+          enrollment?.status || 'NOT_ENROLLED'
+        }`
+      );
+      throw new Error(
+        enrollment?.status === 'pending'
+          ? 'Your face enrollment is awaiting Admin/HOD approval.'
+          : enrollment?.status === 'rejected'
+          ? 'Your face enrollment was not approved.'
+          : 'Face enrollment required.'
+      );
+    }
+
+    const todayStr = today();
+    const studentRecords = attendanceDB.getByStudent(student.rollNumber);
+    const existingToday = studentRecords.find((r) => r.date === todayStr);
+
+    console.log(`[Face Attendance] Looking up today's attendance record for date ${todayStr}...`);
+
+    let finalRecord: AttendanceRecord;
+
+    if (existingToday) {
+      console.log(`[Face Attendance] Existing record found for today (ID: ${existingToday.id}) with status: ${existingToday.status}`);
+
+      if (existingToday.status === 'present') {
+        console.log(`[Face Attendance] Attendance already marked as Present.`);
+        return existingToday;
+      }
+
+      // Record exists as Absent / Late / Leave -> UPDATE to Present
+      console.log(
+        `[Face Attendance] Updating existing record from ${existingToday.status} -> Present...`
+      );
+
+      const updatedFields: Partial<AttendanceRecord> = {
+        status: 'present',
+        remarks: 'Updated to Present via Face Recognition & Eye Blink Liveness',
+        timestamp: new Date().toISOString(),
+      };
+
+      attendanceDB.update(existingToday.id, updatedFields);
+
+      finalRecord = {
+        ...existingToday,
+        ...updatedFields,
+      };
+    } else {
+      // No record exists for today yet -> Create new record
+      console.log(
+        `[Face Attendance] No record found for today. Creating new Present attendance record...`
+      );
+
+      const canonicalSubject = `${student.year || '1st Year'}|${student.branch || student.department}|${student.semester || 'Sem 1'}`;
+      const newRecord: Omit<AttendanceRecord, 'id' | 'timestamp'> = {
+        studentId: student.id,
+        rollNumber: student.rollNumber,
+        studentName: student.name,
+        date: todayStr,
+        subject: canonicalSubject,
+        faculty: 'System (Face Recognition)',
+        lectureNumber: 1,
+        status: 'present',
+        remarks: 'Marked Present via Face Recognition',
+        year: student.year,
+        branch: student.branch || student.department,
+        semesterNum: student.semester,
+      };
+
+      attendanceDB.saveSession([newRecord]);
+      const savedList = attendanceDB.getByDate(todayStr);
+      const saved = savedList.find(
+        (r) => r.rollNumber === student.rollNumber && r.date === todayStr
+      );
+
+      finalRecord = saved || {
+        ...newRecord,
+        id: generateId(),
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    // 4. Verify Database Save Result (Req 14)
+    const verifyList = attendanceDB.getByStudent(student.rollNumber);
+    const verifiedRecord = verifyList.find((r) => r.date === todayStr);
+
+    if (!verifiedRecord || verifiedRecord.status !== 'present') {
+      console.error(
+        `[Face Attendance] Database update verification failed for ${student.rollNumber}`
+      );
+      throw new Error('Attendance could not be saved to database. Please try again.');
+    }
+
+    console.log(
+      `[Face Attendance] Database update successful. Final Verified Status: ${verifiedRecord.status}`
+    );
+
+    // Dispatch event to trigger state updates
+    window.dispatchEvent(new Event('local-storage'));
+
+    return verifiedRecord;
+  },
 };
+
+

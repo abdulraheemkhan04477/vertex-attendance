@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { FiCalendar, FiSearch, FiDownload, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -29,6 +29,16 @@ export default function History() {
   // Prevents duplicate delete requests for the same ID
   const deletingIds = useRef<Set<string>>(new Set());
   const toast = useToast();
+
+  useEffect(() => {
+    const handleStorage = () => setRefreshKey((k) => k + 1);
+    window.addEventListener('local-storage', handleStorage);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('local-storage', handleStorage);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
 
   // Get records based on view mode
   const records = useMemo((): AttendanceRecord[] => {

@@ -28,6 +28,44 @@ export interface Student {
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'leave';
 
+export type FaceEnrollmentStatus = 'not_enrolled' | 'pending' | 'approved' | 'rejected';
+
+export interface FaceEnrollment {
+  id: string;
+  studentId: string;
+  rollNumber: string;
+  studentName: string;
+  branch: string;
+  semester: string;
+  year: string;
+  status: FaceEnrollmentStatus;
+  descriptors: number[][]; // Array of 128-float descriptors
+  sampleImages?: string[]; // Optional base64 sample previews
+  rejectionReason?: string;
+  submittedAt: string;
+  updatedAt: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  permissionGranted?: boolean;
+  permissionGrantedBy?: string;
+  permissionGrantedAt?: string;
+}
+
+export type FingerprintEnrollmentStatus = 'not_enrolled' | 'approved' | 'enrolled';
+
+export interface FingerprintEnrollment {
+  id: string;
+  studentId: string;
+  rollNumber: string;
+  studentName: string;
+  branch?: string;
+  semester?: string;
+  year?: string;
+  status: FingerprintEnrollmentStatus;
+  fingerprintData?: string;
+  enrolledAt: string;
+}
+
 export interface AttendanceRecord {
   id: string;
   studentId: string;
@@ -61,7 +99,7 @@ export interface QrSession {
   createdBy: string;
 }
 
-export type UserRole = 'superadmin' | 'college_admin' | 'hod' | 'teacher';
+export type UserRole = 'superadmin' | 'college_admin' | 'hod' | 'teacher' | 'student';
 
 export interface User {
   id: string;
@@ -75,7 +113,14 @@ export interface User {
   assignedClasses?: Array<{ year: string; branch: string; semester: string; section?: string }>; // For Teachers
   isActive: boolean;
   createdAt: string;
+  // Extended student user fields
+  rollNo?: string;
+  rollNumber?: string;
+  branch?: string;
+  year?: string;
+  semester?: string;
 }
+
 
 export interface AppSettings {
   instituteName: string;
@@ -101,6 +146,7 @@ export interface AppSettings {
   timeFormat?: string;
   autoLogoutTimer?: number; // In minutes
   dashboardDefaultPage?: string;
+  storageQuotaMb?: number; // Target project storage quota in MB
 }
 
 export interface LeaveRequest {
@@ -162,6 +208,59 @@ export interface ToastMessage {
   duration?: number;
 }
 
+// ── Fees Module Types ──────────────────────────────────────────────
+export type FeeType = 'Tuition Fee' | 'Examination Fee' | 'Library Fee' | 'Hostel Fee' | 'Transport Fee' | 'Other Fee';
+
+export type PaymentMethod = 'Cash' | 'UPI' | 'Card' | 'Bank Transfer' | 'Other';
+
+export interface FeeStructure {
+  id: string;
+  collegeId?: string;
+  course: string;
+  branch: string;
+  year: string;
+  semester: string;
+  feeType: FeeType;
+  amount: number;
+  dueDate: string;
+  academicSession: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FeePayment {
+  id: string;
+  studentId: string;
+  rollNumber: string;
+  studentName: string;
+  branch: string;
+  year: string;
+  semester: string;
+  feeStructureId?: string;
+  feeType: FeeType;
+  amount: number;
+  paymentDate: string;
+  paymentMethod: PaymentMethod;
+  transactionId: string;
+  remarks?: string;
+  collectedBy: string;
+  collectedByRole: string;
+  receiptNo: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StudentFeeSummary {
+  student: Student;
+  totalFee: number;
+  paidFee: number;
+  pendingFee: number;
+  status: 'Paid' | 'Partial' | 'Unpaid';
+  lastPaymentDate?: string;
+}
+
+
 // ── Academic Structure ───────────────────────────────────────────
 export const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'] as const;
 export type Year = typeof YEARS[number];
@@ -169,11 +268,11 @@ export type Year = typeof YEARS[number];
 export const BRANCHES = [
   'EC/ECE',
   'CS/CSE',
-  'ME/MECH',
-  'CE/CIVIL',
   'EE',
   'IT',
   'Biotech',
+  'ME/MECH',
+  'Civil',
   'CSD',
   'AI/ML',
 ] as const;

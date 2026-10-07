@@ -3,30 +3,32 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   FiHome, FiClipboard, FiCalendar, FiBarChart2, FiFileText,
   FiUsers, FiSettings, FiLogOut, FiChevronLeft, FiChevronRight,
-  FiZap, FiShield
+  FiZap, FiShield, FiCpu, FiDollarSign
 } from 'react-icons/fi';
 import { useStore } from '../../store/useStore';
 import { useAuth } from '../../hooks/useAuth';
 
 const NAV_ITEMS = [
-  { path: '/dashboard',  label: 'Dashboard',  icon: <FiHome />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
+  { path: '/dashboard', label: 'Dashboard', icon: <FiHome />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
   { path: '/attendance', label: 'Attendance', icon: <FiClipboard />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
   { path: '/qr-attendance', label: 'QR Attendance', icon: <FiZap />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
-  { path: '/history',    label: 'History',    icon: <FiCalendar />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
-  { path: '/leaves',     label: 'Leaves',     icon: <FiFileText />, roles: ['superadmin', 'college_admin', 'hod'] },
-  { path: '/analytics',  label: 'Analytics',  icon: <FiBarChart2 />, roles: ['superadmin', 'college_admin', 'hod'] },
-  { path: '/reports',    label: 'Reports',    icon: <FiFileText />, roles: ['superadmin', 'college_admin', 'hod'] },
-  { path: '/students',   label: 'Students',   icon: <FiUsers />, roles: ['superadmin', 'college_admin', 'hod'] },
-  { path: '/staff',      label: 'Staff',      icon: <FiShield />, roles: ['superadmin', 'college_admin', 'hod'] },
-  { path: '/settings',   label: 'Settings',   icon: <FiSettings />, roles: ['superadmin', 'college_admin', 'hod'] },
+  { path: '/biometric', label: 'Biometric', icon: <FiCpu />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
+  { path: '/history', label: 'History', icon: <FiCalendar />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
+  { path: '/fees', label: 'Fees', icon: <FiDollarSign />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
+  { path: '/leaves', label: 'Leaves', icon: <FiFileText />, roles: ['superadmin', 'college_admin', 'hod'] },
+  { path: '/analytics', label: 'Analytics', icon: <FiBarChart2 />, roles: ['superadmin', 'college_admin', 'hod', 'teacher'] },
+  { path: '/reports', label: 'Reports', icon: <FiFileText />, roles: ['superadmin', 'college_admin', 'hod'] },
+  { path: '/students', label: 'Students', icon: <FiUsers />, roles: ['superadmin', 'college_admin', 'hod'] },
+  { path: '/staff', label: 'Staff', icon: <FiShield />, roles: ['superadmin', 'college_admin', 'hod'] },
+  { path: '/settings', label: 'Settings', icon: <FiSettings />, roles: ['superadmin', 'college_admin', 'hod'] },
 ];
 
 export function Sidebar() {
   const { sidebarOpen, toggleSidebar, settings, currentUser } = useStore();
   const { logout } = useAuth();
   const location = useLocation();
-  
-  const filteredNavItems = NAV_ITEMS.filter(item => 
+
+  const filteredNavItems = NAV_ITEMS.filter(item =>
     !item.roles || (currentUser && item.roles.includes(currentUser.role))
   );
 
@@ -46,9 +48,8 @@ export function Sidebar() {
       </AnimatePresence>
 
       <aside
-        className={`fixed left-0 top-0 h-full z-30 bg-gray-900 dark:bg-gray-950 flex flex-col overflow-hidden shadow-2xl transition-all duration-300 ${
-          sidebarOpen ? 'w-[260px] translate-x-0' : 'w-[260px] lg:w-[72px] -translate-x-full lg:translate-x-0'
-        }`}
+        className={`fixed left-0 top-0 h-full z-30 bg-gray-900 dark:bg-gray-950 flex flex-col overflow-hidden shadow-2xl transition-all duration-300 ${sidebarOpen ? 'w-[260px] translate-x-0' : 'w-[260px] lg:w-[72px] -translate-x-full lg:translate-x-0'
+          }`}
       >
         {/* Header */}
         <div className="flex items-center h-16 px-4 border-b border-gray-800 flex-shrink-0">
@@ -62,7 +63,7 @@ export function Sidebar() {
                 className="flex items-center gap-2 flex-1 min-w-0"
               >
                 <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-cover"/> : <FiShield className="w-4 h-4 text-white" />}
+                  {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-cover" /> : <FiShield className="w-4 h-4 text-white" />}
                 </div>
                 <div className="min-w-0">
                   <p className="text-white text-sm font-bold truncate">{settings.instituteName || 'Attendance System'}</p>
@@ -77,7 +78,7 @@ export function Sidebar() {
                 exit={{ opacity: 0 }}
                 className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center mx-auto overflow-hidden"
               >
-                {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-cover"/> : <FiShield className="w-4 h-4 text-white" />}
+                {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-cover" /> : <FiShield className="w-4 h-4 text-white" />}
               </motion.div>
             )}
           </AnimatePresence>

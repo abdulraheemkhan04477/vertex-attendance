@@ -9,6 +9,7 @@ import { authService } from '../services/auth';
 import { usersDB, authDB, resetAcademicSession } from '../services/db';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../hooks/useAuth';
+import StorageSection from '../components/settings/StorageSection';
 
 export default function Settings() {
   const { settings, updateSettings, theme, toggleTheme: _toggleTheme, currentUser, setCurrentUser } = useStore();
@@ -298,6 +299,9 @@ export default function Settings() {
         </div>
       </motion.div>
       )}
+
+      {/* Storage Section (SuperAdmin only) */}
+      {currentUser?.role === 'superadmin' && <StorageSection />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Theme Toggle */}

@@ -69,6 +69,12 @@ function StudentPortalLayout() {
               >
                 Leaves
               </NavLink>
+              <NavLink 
+                to="/student/fees" 
+                className={({ isActive }) => `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}`}
+              >
+                Fees
+              </NavLink>
             </nav>
           </div>
           

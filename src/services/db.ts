@@ -8,10 +8,11 @@
  *  - This keeps all existing component code working unchanged (sync API)
  */
 
-import type { Student, AttendanceRecord, AppSettings, User } from '../types';
+import type { Student, AttendanceRecord, AppSettings, User, FaceEnrollment, FingerprintEnrollment } from '../types';
 import { STUDENTS_DATA } from '../data/students';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { isSameDepartment, normalizeDepartment } from '../utils/departmentUtils';
+import { syncFeesFromCloud } from './feesDb';
 
 const KEYS = {
   STUDENTS: 'vertex_students',
@@ -26,6 +27,8 @@ const KEYS = {
   COLLEGES: 'vertex_colleges',
   LEAVES: 'vertex_leaves',
   SESSIONS: 'vertex_sessions',
+  FACE_ENROLLMENTS: 'vertex_face_enrollments',
+  FINGERPRINT_ENROLLMENTS: 'vertex_fingerprint_enrollments',
 } as const;
 
 // ─── Active College Helper ───────────────────────────────────────────────────
@@ -238,6 +241,9 @@ export async function syncFromCloud(): Promise<void> {
       const usersObj = getObj('users');
       if (usersObj) setItem(KEYS.USERS, usersObj as any[]);
 
+      const faceEnrollmentsObj = getObj('face_enrollments');
+      if (faceEnrollmentsObj) setItem(KEYS.FACE_ENROLLMENTS, faceEnrollmentsObj as any[]);
+
       const localStudents = getItem<Student>(KEYS.STUDENTS) || [];
       const localAtt = getItem<AttendanceRecord>(KEYS.ATTENDANCE) || [];
 
@@ -293,6 +299,9 @@ export async function syncFromCloud(): Promise<void> {
       }));
       setItem(KEYS.QR_SESSIONS, formatted);
     }
+
+    // Pull Fees Data
+    await syncFeesFromCloud();
 
     localStorage.setItem(KEYS.CLOUD_SYNCED, 'true');
   } catch (err) {
@@ -412,6 +421,32 @@ export const usersDB = {
       }
       return u;
     });
+
+    const envSuperUsername = import.meta.env.VITE_SUPERADMIN_USERNAME;
+    const envSuperPassword = import.meta.env.VITE_SUPERADMIN_PASSWORD;
+
+    if (envSuperUsername && envSuperPassword) {
+      const idx = items.findIndex((u) => u.role === 'superadmin' || u.id === 'super-admin-1');
+      if (idx >= 0) {
+        items[idx] = {
+          ...items[idx],
+          username: envSuperUsername,
+          password: envSuperPassword,
+          isActive: true,
+        };
+      } else {
+        items.push({
+          id: 'super-admin-1',
+          username: envSuperUsername,
+          password: envSuperPassword,
+          role: 'superadmin',
+          name: 'System Owner',
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+
     return items;
   },
 
@@ -420,7 +455,8 @@ export const usersDB = {
   },
 
   getByUsername(username: string): User | undefined {
-    return this.getAll().find((u) => u.username === username);
+    const q = username.trim().toLowerCase();
+    return this.getAll().find((u) => u.username.trim().toLowerCase() === q);
   },
 
   add(user: Omit<User, 'id'>): User {
@@ -470,6 +506,16 @@ export const usersDB = {
         if (error) console.warn('[DB] Supabase delete user error:', error.message);
       });
     }
+  },
+
+  getStudentsByClass(year: string, branchNameOrCode: string): any[] {
+    const norm = normalizeDepartment(branchNameOrCode);
+    return studentsDB.getAll().filter(s => {
+      const sNorm = normalizeDepartment(s.branch || s.department);
+      const bMatch = sNorm === norm || sNorm.includes(norm) || norm.includes(sNorm);
+      const yMatch = !year || s.year === year || s.year === 'All';
+      return bMatch && yMatch;
+    }).map(s => ({ ...s, rollNo: s.rollNumber }));
   },
 };
 
@@ -620,6 +666,7 @@ export const attendanceDB = {
     });
 
     setItem<AttendanceRecord>(KEYS.ATTENDANCE, all);
+    window.dispatchEvent(new Event('local-storage'));
 
     // Background cloud upsert
     if (isSupabaseConfigured && supabase && upserted.length > 0) {
@@ -638,6 +685,7 @@ export const attendanceDB = {
       (r) => !(r.date === date && r.subject === subject && r.lectureNumber === lectureNumber),
     );
     setItem<AttendanceRecord>(KEYS.ATTENDANCE, filtered);
+    window.dispatchEvent(new Event('local-storage'));
 
     // Cloud delete - MUST await so it's committed before any refresh
     if (isSupabaseConfigured && supabase && toDelete.length > 0) {
@@ -653,6 +701,7 @@ export const attendanceDB = {
     if (idx >= 0) {
       all[idx] = { ...all[idx], ...changes, timestamp: new Date().toISOString() };
       setItem<AttendanceRecord>(KEYS.ATTENDANCE, all);
+      window.dispatchEvent(new Event('local-storage'));
       // Background cloud sync
       if (isSupabaseConfigured && supabase) {
         supabase.from('attendance_records').update(attendanceToRow(changes)).eq('id', id).then(({ error }) => {
@@ -666,6 +715,7 @@ export const attendanceDB = {
     const all = getItem<AttendanceRecord>(KEYS.ATTENDANCE);
     const filtered = all.filter((r) => r.id !== id);
     setItem<AttendanceRecord>(KEYS.ATTENDANCE, filtered);
+    window.dispatchEvent(new Event('local-storage'));
     // Cloud delete - MUST await so it's committed before any refresh
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase.from('attendance_records').delete().eq('id', id);
@@ -908,6 +958,193 @@ export const authDB = {
   },
   clearStudentToken(): void {
     localStorage.removeItem(KEYS.STUDENT_AUTH);
+  },
+};
+
+// ─── Face Enrollments DB ───────────────────────────────────────────────────────
+export const faceEnrollmentDB = {
+  getAll(): FaceEnrollment[] {
+    return getItem<FaceEnrollment>(KEYS.FACE_ENROLLMENTS);
+  },
+  getByStudentId(studentId: string): FaceEnrollment | null {
+    const list = this.getAll();
+    return list.find((e) => e.studentId === studentId) || null;
+  },
+  getByRollNumber(rollNumber: string): FaceEnrollment | null {
+    const list = this.getAll();
+    return list.find((e) => e.rollNumber === rollNumber) || null;
+  },
+  grantPermission(student: Student, grantedBy: string): FaceEnrollment {
+    const list = this.getAll();
+    const index = list.findIndex((e) => e.rollNumber === student.rollNumber);
+    const now = new Date().toISOString();
+    let enrollment: FaceEnrollment;
+
+    if (index >= 0) {
+      list[index] = {
+        ...list[index],
+        permissionGranted: true,
+        permissionGrantedBy: grantedBy,
+        permissionGrantedAt: now,
+        updatedAt: now,
+      };
+      enrollment = list[index];
+    } else {
+      enrollment = {
+        id: generateId(),
+        studentId: student.id,
+        rollNumber: student.rollNumber,
+        studentName: student.name,
+        branch: student.branch || student.department || 'General',
+        semester: student.semester || 'Sem 1',
+        year: student.year || '1st Year',
+        status: 'not_enrolled',
+        descriptors: [],
+        sampleImages: [],
+        permissionGranted: true,
+        permissionGrantedBy: grantedBy,
+        permissionGrantedAt: now,
+        submittedAt: now,
+        updatedAt: now,
+      };
+      list.push(enrollment);
+    }
+    setItem(KEYS.FACE_ENROLLMENTS, list);
+    this.syncToCloud(list);
+    window.dispatchEvent(new Event('local-storage'));
+    return enrollment;
+  },
+  revokePermission(rollNumber: string): FaceEnrollment | null {
+    const list = this.getAll();
+    const index = list.findIndex((e) => e.rollNumber === rollNumber);
+    if (index >= 0) {
+      list[index] = {
+        ...list[index],
+        permissionGranted: false,
+        updatedAt: new Date().toISOString(),
+      };
+      setItem(KEYS.FACE_ENROLLMENTS, list);
+      this.syncToCloud(list);
+      window.dispatchEvent(new Event('local-storage'));
+      return list[index];
+    }
+    return null;
+  },
+  save(enrollment: FaceEnrollment): void {
+    const list = this.getAll();
+    const index = list.findIndex(
+      (e) => e.id === enrollment.id || e.rollNumber === enrollment.rollNumber
+    );
+    const existing = index >= 0 ? list[index] : null;
+
+    // Server/DB Side Verification of Permission (Req 1 & 11)
+    if (!existing || !existing.permissionGranted) {
+      console.warn(`[faceEnrollmentDB] Save rejected: Face enrollment permission has not been granted by Admin for student ${enrollment.rollNumber}`);
+      throw new Error('Face enrollment permission has not been granted by Admin.');
+    }
+
+    const updatedEnrollment: FaceEnrollment = {
+      ...enrollment,
+      permissionGranted: true,
+      permissionGrantedBy: existing.permissionGrantedBy,
+      permissionGrantedAt: existing.permissionGrantedAt,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (index >= 0) {
+      list[index] = updatedEnrollment;
+    } else {
+      list.push(updatedEnrollment);
+    }
+    setItem(KEYS.FACE_ENROLLMENTS, list);
+    this.syncToCloud(list);
+    window.dispatchEvent(new Event('local-storage'));
+  },
+  approve(id: string, approvedBy: string): FaceEnrollment | null {
+    const list = this.getAll();
+    const target = list.find((e) => e.id === id);
+    if (target) {
+      target.status = 'approved';
+      target.approvedBy = approvedBy;
+      target.approvedAt = new Date().toISOString();
+      target.updatedAt = new Date().toISOString();
+      setItem(KEYS.FACE_ENROLLMENTS, list);
+      this.syncToCloud(list);
+      window.dispatchEvent(new Event('local-storage'));
+      return target;
+    }
+    return null;
+  },
+  reject(id: string, reason?: string): FaceEnrollment | null {
+    const list = this.getAll();
+    const target = list.find((e) => e.id === id);
+    if (target) {
+      target.status = 'rejected';
+      target.rejectionReason = reason || 'Enrollment rejected by Admin/HOD';
+      target.updatedAt = new Date().toISOString();
+      setItem(KEYS.FACE_ENROLLMENTS, list);
+      this.syncToCloud(list);
+      window.dispatchEvent(new Event('local-storage'));
+      return target;
+    }
+    return null;
+  },
+  delete(id: string): void {
+    const list = this.getAll().filter((e) => e.id !== id);
+    setItem(KEYS.FACE_ENROLLMENTS, list);
+    this.syncToCloud(list);
+    window.dispatchEvent(new Event('local-storage'));
+  },
+  syncToCloud(list: FaceEnrollment[]): void {
+    if (isSupabaseConfigured && supabase) {
+      supabase
+        .from('app_settings')
+        .upsert({ key: 'face_enrollments', value: list })
+        .then(({ error }) => {
+          if (error)
+            console.warn(
+              '[DB] Supabase face_enrollments sync error:',
+              error.message
+            );
+        });
+    }
+  },
+};
+
+// ─── Fingerprint Enrollments DB ────────────────────────────────────────────────
+export const fingerprintEnrollmentDB = {
+  getAll(): FingerprintEnrollment[] {
+    return getItem<FingerprintEnrollment>(KEYS.FINGERPRINT_ENROLLMENTS);
+  },
+  getByRollNumber(rollNumber: string): FingerprintEnrollment | null {
+    const list = this.getAll();
+    return list.find((e) => e.rollNumber === rollNumber) || null;
+  },
+  save(enrollment: FingerprintEnrollment): void {
+    const list = this.getAll();
+    const index = list.findIndex(e => e.rollNumber === enrollment.rollNumber);
+    if (index >= 0) {
+      list[index] = enrollment;
+    } else {
+      list.push(enrollment);
+    }
+    setItem(KEYS.FINGERPRINT_ENROLLMENTS, list);
+    this.syncToCloud(list);
+    window.dispatchEvent(new Event('local-storage'));
+  },
+  syncToCloud(list: FingerprintEnrollment[]): void {
+    if (isSupabaseConfigured && supabase) {
+      supabase
+        .from('app_settings')
+        .upsert({ key: 'fingerprint_enrollments', value: list })
+        .then(({ error }) => {
+          if (error)
+            console.warn(
+              '[DB] Supabase fingerprint_enrollments sync error:',
+              error.message
+            );
+        });
+    }
   },
 };
 

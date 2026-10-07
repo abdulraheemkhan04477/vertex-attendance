@@ -9,13 +9,12 @@ export const authService = {
   },
 
   login(username: string, password: string): boolean {
-    const user = usersDB.getByUsername(username.trim());
-    if (user && user.password === password && user.isActive) {
+    const uName = username.trim();
+    const pWord = password.trim();
+    const user = usersDB.getByUsername(uName);
+    if (user && user.password.trim() === pWord && user.isActive) {
       authDB.setToken(user.id);
       useStore.getState().setCurrentUser(user);
-      if (user.role === 'superadmin') {
-        // Superadmin login
-      }
       return true;
     }
     return false;
@@ -38,13 +37,77 @@ export const authService = {
   }
 };
 
-export const studentAuthService = {
-  login(rollNumber: string, password: string): boolean {
-    const student = studentsDB.getByRollNumber(rollNumber);
-    if (student && student.password === password) {
-      authDB.setStudentToken(rollNumber);
-      return true;
+export function normalizeDob(val: string): string {
+  if (!val) return '';
+  const cleaned = val.trim().replace(/[.\-\/]/g, ' ');
+  const parts = cleaned.split(/\s+/);
+  if (parts.length === 3) {
+    let day = '', month = '', year = '';
+    if (parts[0].length === 4) {
+      // YYYY MM DD
+      year = parts[0];
+      month = parts[1].padStart(2, '0');
+      day = parts[2].padStart(2, '0');
+    } else if (parts[2].length === 4) {
+      // DD MM YYYY
+      day = parts[0].padStart(2, '0');
+      month = parts[1].padStart(2, '0');
+      year = parts[2];
     }
+    if (year && month && day) {
+      return `${year}-${month}-${day}`;
+    }
+  }
+  const d = new Date(val);
+  if (!isNaN(d.getTime())) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return val.trim();
+}
+
+export const studentAuthService = {
+  async login(rollNumber: string, dobInput: string): Promise<boolean> {
+    const normRoll = rollNumber.trim().toUpperCase();
+    const normInputDob = normalizeDob(dobInput);
+
+    if (!normRoll || !normInputDob) return false;
+
+    // Check cloud if configured
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('students')
+          .select('*')
+          .ilike('roll_number', normRoll)
+          .maybeSingle();
+
+        if (data && !error) {
+          const dbDob = normalizeDob(data.dob || '');
+          if (dbDob && dbDob === normInputDob) {
+            authDB.setStudentToken(data.roll_number);
+            return true;
+          } else {
+            return false;
+          }
+        }
+      } catch (e) {
+        console.error('[STUDENT AUTH] Supabase check error:', e);
+      }
+    }
+
+    // Fallback/Local check
+    const student = studentsDB.getAll().find((s) => s.rollNumber.trim().toUpperCase() === normRoll);
+    if (student) {
+      const dbDob = normalizeDob(student.dob || '');
+      if (dbDob && dbDob === normInputDob) {
+        authDB.setStudentToken(student.rollNumber);
+        return true;
+      }
+    }
+
     return false;
   },
 
@@ -74,7 +137,6 @@ export const studentAuthService = {
           .maybeSingle();
           
         if (data && !error) {
-          // rowToStudent mapping inline since it's private in db.ts
           const freshStudent: Student = {
             id: data.id,
             rollNumber: data.roll_number,
@@ -103,7 +165,7 @@ export const studentAuthService = {
           if (index >= 0) {
             existing[index] = freshStudent;
             localStorage.setItem('vertex_students', JSON.stringify(existing));
-            window.dispatchEvent(new Event('local-storage')); // trigger updates
+            window.dispatchEvent(new Event('local-storage'));
           }
           return freshStudent;
         }

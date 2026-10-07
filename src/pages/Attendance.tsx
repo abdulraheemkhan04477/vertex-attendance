@@ -82,6 +82,18 @@ export default function Attendance() {
     return list;
   }, [allStudents, year, branch]);
 
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useEffect(() => {
+    const handleStorage = () => setRefreshTrigger((prev) => prev + 1);
+    window.addEventListener('local-storage', handleStorage);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('local-storage', handleStorage);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
   // Load existing session data when session params change
   useEffect(() => {
     if (!fullSubject) {
@@ -101,7 +113,7 @@ export default function Attendance() {
     setRemarkMap(rMap);
     undoStack.current = [];
     redoStack.current = [];
-  }, [date, fullSubject, lectureNumber, branchFilteredStudents]);
+  }, [date, fullSubject, lectureNumber, branchFilteredStudents, refreshTrigger]);
 
   const pushUndo = useCallback((prev: Record<string, AttendanceStatus | null>) => {
     undoStack.current = [...undoStack.current.slice(-19), prev];

@@ -8,6 +8,7 @@ import { formatDate } from '../../utils/dateUtils';
 import { STATUS_LABELS } from '../../types';
 import { StudentProfileEditModal } from '../../components/student/StudentProfileEditModal';
 import { QRScannerModal } from '../../components/student/QRScannerModal';
+import { FaceAttendanceModal } from '../../components/student/FaceAttendanceModal';
 import { Button } from '../../components/ui/Button';
 
 export default function StudentDashboard() {
@@ -15,6 +16,7 @@ export default function StudentDashboard() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [isFaceModalOpen, setIsFaceModalOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -89,6 +91,9 @@ export default function StudentDashboard() {
           </div>
 
           <div className="mt-6 flex flex-wrap gap-4">
+            <Button onClick={() => setIsFaceModalOpen(true)} variant="ghost" icon={<FiCamera />} className="bg-emerald-500 hover:bg-emerald-400 text-white shadow-md font-bold px-4 py-2 border-none" size="sm">
+              Face Attendance
+            </Button>
             <Button onClick={() => setIsQRModalOpen(true)} variant="ghost" icon={<FiCamera />} className="bg-white text-indigo-700 hover:bg-indigo-50 shadow-md font-bold px-4 py-2" size="sm">
               Scan QR for Attendance
             </Button>
@@ -279,6 +284,12 @@ export default function StudentDashboard() {
       <QRScannerModal 
         isOpen={isQRModalOpen} 
         onClose={() => setIsQRModalOpen(false)} 
+      />
+      <FaceAttendanceModal
+        isOpen={isFaceModalOpen}
+        onClose={() => setIsFaceModalOpen(false)}
+        student={student}
+        onAttendanceMarked={() => setRefreshTrigger((prev) => prev + 1)}
       />
     </>
   );
